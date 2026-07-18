@@ -68,7 +68,7 @@ class ApiClient {
   };
 
   resumes = {
-    uploadResume: (file: File, title: string, versionName: string, roleLabel: string = 'GENERAL') => {
+    uploadResume: (file: File, title: string, versionName: string, roleLabel: string = 'General') => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', title);

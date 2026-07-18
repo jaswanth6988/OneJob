@@ -26,12 +26,8 @@ class RemoteOKConnector(BaseJobConnector):
         limit: int = 50,
     ) -> AsyncGenerator[Dict, None]:
         url = "https://remoteok.com/api"
-        # RemoteOK API has limited filtering, so we fetch and filter locally
-        # Though it supports 'tags' param: ?tags=react,node
-        
+        # We fetch all jobs and filter locally because RemoteOK's tag filter is very strict
         params = {}
-        if keywords:
-            params['tags'] = ",".join([k.lower().replace(" ", "-") for k in keywords[:2]])
             
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
@@ -40,9 +36,18 @@ class RemoteOKConnector(BaseJobConnector):
                 data = response.json()
                 
                 # RemoteOK API returns an array where the first element is legal info
-                # Skip the first element if it's not a job
                 jobs = [j for j in data if j.get("id") and j.get("company")]
                 
+                # Filter locally based on keywords
+                if keywords:
+                    keywords_lower = [k.lower() for k in keywords]
+                    filtered_jobs = []
+                    for j in jobs:
+                        text_to_search = (j.get("position", "") + " " + j.get("description", "") + " " + " ".join(j.get("tags", []))).lower()
+                        if any(k in text_to_search for k in keywords_lower):
+                            filtered_jobs.append(j)
+                    jobs = filtered_jobs
+
                 for i, job in enumerate(jobs):
                     if i >= limit:
                         break

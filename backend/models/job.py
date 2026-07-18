@@ -43,7 +43,7 @@ class JobPosting(Document):
     status: JobStatus = JobStatus.NEW
     match_result: Dict[str, Any] = Field(default_factory=dict)
     
-    duplicate_key: Indexed(str)
+    duplicate_key: Indexed(str) = ""
     tags: List[str] = Field(default_factory=list)
     is_priority_company: bool = False
     

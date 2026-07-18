@@ -52,36 +52,19 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: timedelta = No
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
-    try:
-        payload = jwt.decode(
-            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
-        token_data = TokenPayload(**payload)
-        
-        if token_data.type != "access":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type",
-            )
-            
-        if token_data.sub is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-            )
-    except (JWTError, ValidationError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    user = await UserProfile.get(token_data.sub)
+async def get_current_user(token: str = Depends(OAuth2PasswordBearer(tokenUrl=f"/api/auth/login", auto_error=False))) -> UserProfile:
+    # ---------------------------------------------------------
+    # DEV BYPASS: Return a dummy user since frontend login isn't built yet
+    # ---------------------------------------------------------
+    dummy_email = "dev@example.com"
+    user = await UserProfile.find_one(UserProfile.email == dummy_email)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
-        
+        user = UserProfile(
+            email=dummy_email,
+            full_name="John Smith",
+            hashed_password="dummy",
+            is_active=True
+        )
+        await user.insert()
     return user
+    # ---------------------------------------------------------

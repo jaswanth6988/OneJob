@@ -12,6 +12,7 @@ from backend.schemas.common import ErrorResponse
 from backend.api.auth import router as auth_router
 from backend.api.profile import router as profile_router
 from backend.api.resumes import router as resumes_router
+from backend.api.jobs import router as jobs_router
 
 logger = get_logger(__name__)
 
@@ -60,6 +61,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(profile_router, prefix="/api/profile", tags=["Profile"])
 app.include_router(resumes_router, prefix="/api/resumes", tags=["Resumes"])
+app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():

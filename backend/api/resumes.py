@@ -64,7 +64,7 @@ async def upload_resume(
         return APIResponse(
             success=True,
             message="Resume uploaded and parsed successfully",
-            data=ResumeResponse.model_validate(resume.model_dump(by_alias=True))
+            data=ResumeResponse.model_validate(resume.model_dump(by_alias=True, mode="json"))
         )
     except Exception as e:
         logger.error("Failed to process resume upload", exc_info=True)
@@ -78,7 +78,7 @@ async def list_resumes(current_user: UserProfile = Depends(get_current_user)):
     resumes = await Resume.find(Resume.user_id.id == current_user.id, Resume.is_active == True).to_list()
     return APIResponse(
         success=True,
-        data=[ResumeListResponse.model_validate(r.model_dump(by_alias=True)) for r in resumes]
+        data=[ResumeListResponse.model_validate(r.model_dump(by_alias=True, mode="json")) for r in resumes]
     )
 
 @router.get("/{id}", response_model=APIResponse[ResumeResponse])
@@ -89,7 +89,7 @@ async def get_resume(id: str, current_user: UserProfile = Depends(get_current_us
         
     return APIResponse(
         success=True,
-        data=ResumeResponse.model_validate(resume.model_dump(by_alias=True))
+        data=ResumeResponse.model_validate(resume.model_dump(by_alias=True, mode="json"))
     )
 
 @router.put("/{id}", response_model=APIResponse[ResumeResponse])
@@ -110,7 +110,7 @@ async def update_resume(
     return APIResponse(
         success=True,
         message="Resume updated successfully",
-        data=ResumeResponse.model_validate(resume.model_dump(by_alias=True))
+        data=ResumeResponse.model_validate(resume.model_dump(by_alias=True, mode="json"))
     )
 
 @router.delete("/{id}", response_model=APIResponse)
