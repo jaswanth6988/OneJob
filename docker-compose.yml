@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: aijob-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-aijob}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-aijob_secret_2024}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-ai_job_portal}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - aijob-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: aijob-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - aijob-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  aijob-network:
+    driver: bridge

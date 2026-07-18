@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+.next/
+out/
+dist/
+build/
+
+# Storage (keep structure, ignore files)
+storage/resumes/*
+storage/screenshots/*
+storage/logs/*
+!storage/resumes/.gitkeep
+!storage/screenshots/.gitkeep
+!storage/logs/.gitkeep
+
+# Docker
+mongodb_data/
+redis_data/
