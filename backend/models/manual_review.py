@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pydantic import Field
 from beanie import Document, Link
-from backend.models.application import ApplicationAttempt
+from backend.models.application import JobApplication
 from backend.models.job import JobPosting
 
 class ManualReviewReason(str, Enum):
@@ -26,7 +26,7 @@ class ReviewSeverity(str, Enum):
     CRITICAL = "CRITICAL"
 
 class ManualReviewItem(Document):
-    attempt_id: Link[ApplicationAttempt]
+    attempt_id: Link[JobApplication]
     job_id: Link[JobPosting]
     
     reason: ManualReviewReason

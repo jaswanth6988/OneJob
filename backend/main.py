@@ -9,10 +9,13 @@ from backend.core.logging import CorrelationIdMiddleware, get_logger
 from backend.schemas.common import ErrorResponse
 
 # API Routers
+import os
+from fastapi.staticfiles import StaticFiles
 from backend.api.auth import router as auth_router
 from backend.api.profile import router as profile_router
 from backend.api.resumes import router as resumes_router
 from backend.api.jobs import router as jobs_router
+from backend.api.applications import router as applications_router
 
 logger = get_logger(__name__)
 
@@ -62,6 +65,11 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(profile_router, prefix="/api/profile", tags=["Profile"])
 app.include_router(resumes_router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
+app.include_router(applications_router, prefix="/api/applications", tags=["Applications"])
+
+# Mount static storage for screenshots & resumes
+os.makedirs("storage", exist_ok=True)
+app.mount("/storage", StaticFiles(directory="storage"), name="storage")
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():

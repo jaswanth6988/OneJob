@@ -13,6 +13,22 @@ export default function JobDetailPage() {
   const router = useRouter();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [applyMessage, setApplyMessage] = useState<string | null>(null);
+
+  const handleAIApply = async (mode: 'DRY_RUN' | 'LIVE' = 'DRY_RUN') => {
+    setApplying(true);
+    setApplyMessage(null);
+    try {
+      await api.applications.start(job._id, mode);
+      setApplyMessage(`AI Auto-Application (${mode.replace('_', ' ')}) Started! Check Applications tab.`);
+    } catch (e: any) {
+      console.error(e);
+      setApplyMessage(e.message || "Failed to start AI application.");
+    } finally {
+      setApplying(false);
+    }
+  };
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -104,16 +120,40 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 min-w-[200px]">
+          <div className="flex flex-col gap-3 min-w-[240px]">
+            <button
+              onClick={() => handleAIApply('DRY_RUN')}
+              disabled={applying}
+              className="flex items-center justify-center w-full px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50"
+            >
+              <Sparkles className={`w-5 h-5 mr-2 text-purple-200 ${applying ? 'animate-spin' : 'animate-pulse'}`} />
+              {applying ? "Starting AI Applier..." : "1-Click AI Apply (Safe Test)"}
+            </button>
+            <button
+              onClick={() => handleAIApply('LIVE')}
+              disabled={applying}
+              className="flex items-center justify-center w-full px-4 py-2 rounded-lg bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 hover:text-white border border-slate-700 transition-colors text-xs"
+            >
+              🚀 Live Auto-Submit Apply
+            </button>
             <a 
               href={job.apply_url || job.url} 
               target="_blank" 
               rel="noreferrer"
-              className="flex items-center justify-center w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 transition-colors"
+              className="flex items-center justify-center w-full px-4 py-2 rounded-lg bg-slate-900 text-slate-400 font-medium hover:text-slate-200 border border-slate-800 transition-colors text-xs mt-1"
             >
-              Apply Now
-              <ExternalLink className="w-4 h-4 ml-2" />
+              Open Manual Browser Form
+              <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
             </a>
+            {applyMessage && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs text-center font-medium animate-in fade-in mt-1">
+                {applyMessage}
+                <br />
+                <Link href="/applications" className="underline font-bold mt-1 inline-block text-white hover:text-blue-300">
+                  Go to Tracker Dashboard ➔
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

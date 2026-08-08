@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Acme AI Corp - Career Portal Application</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 40px; }
+        .container { max-width: 650px; margin: 0 auto; background-color: #1e293b; padding: 35px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h1 { color: #38bdf8; margin-top: 0; font-size: 26px; }
+        p { color: #94a3b8; font-size: 14px; }
+        .form-group { margin-bottom: 22px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #e2e8f0; }
+        input[type="text"], input[type="email"], input[type="tel"], textarea, input[type="file"] {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background-color: #0f172a; color: #fff; box-sizing: border-box; font-size: 14px;
+        }
+        textarea { min-height: 100px; resize: vertical; }
+        button { background: linear-gradient(to right, #2563eb, #7c3aed); color: #fff; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; }
+        button:hover { opacity: 0.9; }
+        #success-message { display: none; background-color: #064e3b; color: #34d399; padding: 20px; border-radius: 8px; text-align: center; font-weight: bold; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Acme AI Corp - Job Application</h1>
+        <p>Position: Senior Remote AI & Full Stack Engineer (Python/React)</p>
+        
+        <form id="applyForm" onsubmit="handleSubmit(event)">
+            <div class="form-group">
+                <label for="fname">First Name *</label>
+                <input type="text" id="fname" name="first_name" placeholder="Enter your first name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="lname">Last Name *</label>
+                <input type="text" id="lname" name="last_name" placeholder="Enter your last name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" placeholder="you@company.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone / Mobile *</label>
+                <input type="tel" id="phone" name="phone" placeholder="+1 (555) 000-0000" required>
+            </div>
+
+            <div class="form-group">
+                <label for="linkedin">LinkedIn Profile URL</label>
+                <input type="text" id="linkedin" name="linkedin_url" placeholder="https://linkedin.com/in/yourprofile">
+            </div>
+
+            <div class="form-group">
+                <label for="why_join">Why are you passionate about working on LLMs, automation, and full-stack AI portals at Acme Corp?</label>
+                <textarea id="why_join" name="why_join" placeholder="Please describe in 2-3 concise sentences..." required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="salary">What are your expected salary requirements or desired compensation structure?</label>
+                <input type="text" id="salary" name="salary" placeholder="e.g., Market negotiable">
+            </div>
+
+            <div class="form-group">
+                <label for="resume">Upload Resume (PDF / DOCX) *</label>
+                <input type="file" id="resume" name="resume_file" accept=".pdf,.docx">
+            </div>
+
+            <button type="submit" id="submitBtn">Submit Official Application 🚀</button>
+        </form>
+
+        <div id="success-message">
+            🎉 Application Successfully Submitted! Our engineering AI team will review your application soon.
+        </div>
+    </div>
+
+    <script>
+        function handleSubmit(e) {
+            e.preventDefault();
+            document.getElementById("applyForm").style.display = "none";
+            document.getElementById("success-message").style.display = "block";
+            return false;
+        }
+    </script>
+</body>
+</html>

@@ -7,7 +7,7 @@ from backend.core.config import settings
 from backend.models.user import UserProfile
 from backend.models.resume import Resume
 from backend.models.job import JobPosting
-from backend.models.application import ApplicationAttempt
+from backend.models.application import JobApplication
 from backend.models.manual_review import ManualReviewItem
 from backend.models.ai_event import AIEventLog
 
@@ -27,7 +27,7 @@ async def init_db() -> None:
             UserProfile,
             Resume,
             JobPosting,
-            ApplicationAttempt,
+            JobApplication,
             ManualReviewItem,
             AIEventLog,
         ],

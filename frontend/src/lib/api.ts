@@ -81,6 +81,12 @@ class ApiClient {
     updateResume: (id: string, data: Partial<Resume>) => this.put<APIResponse<Resume>>(`/resumes/${id}`, data),
     deleteResume: (id: string) => this.delete<APIResponse<void>>(`/resumes/${id}`),
   };
+
+  applications = {
+    list: (status?: string) => this.get<any>(`/applications${status ? `?status=${status}` : ''}`),
+    start: (jobId: string, mode: 'DRY_RUN' | 'LIVE' = 'DRY_RUN', resumeId?: string) => this.post<any>(`/applications/start/${jobId}`, { mode, resume_id: resumeId }),
+    getDetails: (appId: string) => this.get<any>(`/applications/${appId}`),
+  };
 }
 
 export const api = new ApiClient();

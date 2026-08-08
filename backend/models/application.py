@@ -2,39 +2,37 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from enum import Enum
 from pydantic import Field
-from beanie import Document, Link
+from beanie import Document, Indexed, Link
+
 from backend.models.user import UserProfile
-from backend.models.resume import Resume
 from backend.models.job import JobPosting
+from backend.models.resume import Resume
 
 class ApplicationStatus(str, Enum):
-    PENDING = "PENDING"
+    QUEUED = "QUEUED"
     APPLYING = "APPLYING"
-    APPLIED = "APPLIED"
-    MANUAL_REVIEW = "MANUAL_REVIEW"
+    SUBMITTED = "SUBMITTED"
+    REQUIRES_MANUAL_INTERVENTION = "REQUIRES_MANUAL_INTERVENTION"
     FAILED = "FAILED"
-    SKIPPED = "SKIPPED"
-    RETRYING = "RETRYING"
 
-class ApplicationAttempt(Document):
-    job_id: Link[JobPosting]
-    resume_id: Link[Resume]
+class JobApplication(Document):
     user_id: Link[UserProfile]
+    job_id: Link[JobPosting]
+    resume_id: Optional[Link[Resume]] = None
     
-    status: ApplicationStatus = ApplicationStatus.PENDING
-    failure_reason: Optional[str] = None
-    failure_step: Optional[str] = None
+    status: ApplicationStatus = ApplicationStatus.QUEUED
+    mode: str = "DRY_RUN"  # Options: DRY_RUN, LIVE
+    apply_url: str = ""
     
-    retry_count: int = 0
-    max_retries: int = 2
+    submitted_fields: Dict[str, Any] = Field(default_factory=dict)
+    ai_answers: List[Dict[str, str]] = Field(default_factory=list)
+    screenshots: List[str] = Field(default_factory=list)
+    error_log: Optional[str] = None
     
-    screenshot_paths: List[str] = Field(default_factory=list)
-    logs_path: Optional[str] = None
-    submitted_payload_summary: Dict[str, Any] = Field(default_factory=dict)
-    
-    applied_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:
-        name = "application_attempts"
+        name = "job_applications"
