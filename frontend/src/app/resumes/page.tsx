@@ -98,7 +98,7 @@ export default function ResumesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {resumes.map((resume) => (
-            <Card key={resume.id} className="flex flex-col bg-slate-900/50 border-slate-800 hover:border-slate-600 transition-colors">
+            <Card key={resume._id || resume.id} className="flex flex-col bg-slate-900/50 border-slate-800 hover:border-slate-600 transition-colors">
               <div className="p-5 flex-1">
                 <div className="flex justify-between items-start mb-4">
                   <div className="p-2 bg-blue-500/10 rounded-lg">

@@ -7,7 +7,7 @@ celery_app = Celery(
     "ai_job_portal",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["backend.workers.crawlers", "backend.workers.scorer"]
+    include=["backend.workers.crawlers", "backend.workers.scorer", "backend.workers.auto_applier"]
 )
 
 celery_app.conf.update(
