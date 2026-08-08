@@ -82,10 +82,27 @@ class ApiClient {
     deleteResume: (id: string) => this.delete<APIResponse<void>>(`/resumes/${id}`),
   };
 
-  applications = {
+    applications = {
     list: (status?: string) => this.get<any>(`/applications${status ? `?status=${status}` : ''}`),
     start: (jobId: string, mode: 'DRY_RUN' | 'LIVE' = 'DRY_RUN', resumeId?: string) => this.post<any>(`/applications/start/${jobId}`, { mode, resume_id: resumeId }),
     getDetails: (appId: string) => this.get<any>(`/applications/${appId}`),
+  };
+
+  tailor = {
+    analyze: (jobId: string, resumeId?: string) =>
+      this.post<any>(`/tailor/${jobId}${resumeId ? `?resume_id=${resumeId}` : ''}`, {}),
+  };
+
+  interview = {
+    generateQuestions: (jobId: string, resumeId?: string) =>
+      this.post<any>(`/interview/questions/${jobId}${resumeId ? `?resume_id=${resumeId}` : ''}`, {}),
+    evaluateAnswer: (jobId: string, question: string, answer: string, resumeId?: string) =>
+      this.post<any>('/interview/evaluate', { job_id: jobId, question, answer, resume_id: resumeId }),
+  };
+
+  chat = {
+    send: (message: string, history: { role: string; content: string }[] = []) =>
+      this.post<any>('/chat', { message, history }),
   };
 }
 

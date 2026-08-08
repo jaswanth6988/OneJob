@@ -16,6 +16,9 @@ from backend.api.profile import router as profile_router
 from backend.api.resumes import router as resumes_router
 from backend.api.jobs import router as jobs_router
 from backend.api.applications import router as applications_router
+from backend.api.tailor import router as tailor_router
+from backend.api.interview import router as interview_router
+from backend.api.chat import router as chat_router
 
 logger = get_logger(__name__)
 
@@ -66,6 +69,9 @@ app.include_router(profile_router, prefix="/api/profile", tags=["Profile"])
 app.include_router(resumes_router, prefix="/api/resumes", tags=["Resumes"])
 app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(applications_router, prefix="/api/applications", tags=["Applications"])
+app.include_router(tailor_router, prefix="/api/tailor", tags=["Resume Tailor"])
+app.include_router(interview_router, prefix="/api/interview", tags=["Interview Prep"])
+app.include_router(chat_router, prefix="/api/chat", tags=["AI Chat"])
 
 # Mount static storage for screenshots & resumes
 os.makedirs("storage", exist_ok=True)
