@@ -12,6 +12,7 @@ export default function ResumesPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [resumes, setResumes] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Fetch real resumes from backend
   const fetchResumes = async () => {
@@ -28,6 +29,20 @@ export default function ResumesPage() {
   useEffect(() => {
     fetchResumes();
   }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this resume?')) return;
+    setDeletingId(id);
+    try {
+      await api.resumes.deleteResume(id);
+      await fetchResumes();
+    } catch (e) {
+      console.error('Delete failed:', e);
+      alert('Failed to delete resume. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -125,8 +140,16 @@ export default function ResumesPage() {
                   View
                 </Button>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10">
-                    <Trash2 className="h-4 w-4" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10 disabled:opacity-40"
+                    onClick={() => handleDelete(resume._id || resume.id)}
+                    disabled={deletingId === (resume._id || resume.id)}
+                  >
+                    {deletingId === (resume._id || resume.id)
+                      ? <span className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                      : <Trash2 className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>

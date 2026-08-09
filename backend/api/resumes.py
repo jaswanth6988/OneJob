@@ -115,14 +115,22 @@ async def update_resume(
 
 @router.delete("/{id}", response_model=APIResponse)
 async def delete_resume(id: str, current_user: UserProfile = Depends(get_current_user)):
-    resume = await Resume.get(id)
-    if not resume or resume.user_id.id != current_user.id:
-        raise HTTPException(status_code=404, detail="Resume not found")
-        
-    # Soft delete
-    await resume.set({"is_active": False, "updated_at": datetime.now(timezone.utc)})
-    
-    return APIResponse(
-        success=True,
-        message="Resume deleted successfully"
+    from beanie import PydanticObjectId
+    try:
+        obj_id = PydanticObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid resume ID format")
+
+    # Use find_one with combined filter — avoids broken Link attribute comparison
+    resume = await Resume.find_one(
+        Resume.id == obj_id,
+        Resume.user_id.id == current_user.id,
+        Resume.is_active == True
     )
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    # Soft delete — sets is_active=False so it disappears from lists
+    await resume.set({"is_active": False, "updated_at": datetime.now(timezone.utc)})
+
+    return APIResponse(success=True, message="Resume deleted successfully")
