@@ -19,22 +19,20 @@ export enum RemoteType {
 }
 
 export enum ApplicationStatus {
-  PENDING = 'PENDING',
+  QUEUED = 'QUEUED',
   APPLYING = 'APPLYING',
-  APPLIED = 'APPLIED',
-  MANUAL_REVIEW = 'MANUAL_REVIEW',
+  SUBMITTED = 'SUBMITTED',
+  REQUIRES_MANUAL_INTERVENTION = 'REQUIRES_MANUAL_INTERVENTION',
   FAILED = 'FAILED',
-  SKIPPED = 'SKIPPED',
-  RETRYING = 'RETRYING',
 }
 
 export enum RoleLabel {
-  GENERAL = 'GENERAL',
-  DEVELOPER = 'DEVELOPER',
-  DATA_AI = 'DATA_AI',
-  CLOUD = 'CLOUD',
-  SECURITY = 'SECURITY',
-  CUSTOM = 'CUSTOM',
+  GENERAL = 'General',
+  DEVELOPER = 'Developer',
+  DATA_AI = 'Data_AI',
+  CLOUD = 'Cloud',
+  SECURITY = 'Security',
+  CUSTOM = 'Custom',
 }
 
 export enum ManualReviewReason {
@@ -156,26 +154,27 @@ export interface JobPosting {
   tags: string[];
   is_priority_company: boolean;
   discovered_at: string;
+  expires_at?: string;
   created_at: string;
   updated_at: string;
 }
 
 // ── Application ──
 
-export interface ApplicationAttempt {
+export interface ApplicationResponse {
   id: string;
-  job_id: string;
-  resume_id: string;
   user_id: string;
+  job_id: string;
+  resume_id?: string;
   status: ApplicationStatus;
-  failure_reason?: string;
-  failure_step?: string;
-  retry_count: number;
-  max_retries: number;
-  screenshot_paths: string[];
-  logs_path?: string;
-  submitted_payload_summary: Record<string, unknown>;
-  applied_at?: string;
+  mode: string;
+  apply_url: string;
+  submitted_fields: Record<string, unknown>;
+  ai_answers: { question: string; answer: string }[];
+  screenshots: string[];
+  error_log?: string;
+  started_at?: string;
+  completed_at?: string;
   created_at: string;
   updated_at: string;
 }

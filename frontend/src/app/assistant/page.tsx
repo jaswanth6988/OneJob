@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import {
   Bot, Sparkles, Briefcase, MessageSquare, ChevronRight,
   Send, Loader2, CheckCircle, XCircle, AlertCircle, Target,

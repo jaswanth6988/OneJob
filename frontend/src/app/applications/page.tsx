@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
 import { 
   Send, 
   CheckCircle, 
@@ -39,14 +39,20 @@ export default function ApplicationsPage() {
 
   useEffect(() => {
     fetchApplications();
-    // Auto-poll every 4 seconds if any application is currently running automation
+  }, [filter]);
+
+  // Separate polling effect — auto-refresh every 5s if any app is in progress
+  useEffect(() => {
     const timer = setInterval(() => {
-      if (applications.some((a: any) => a.status === "QUEUED" || a.status === "APPLYING")) {
-        fetchApplications();
-      }
-    }, 4000);
+      setApplications(current => {
+        if (current.some((a: any) => a.status === "QUEUED" || a.status === "APPLYING")) {
+          fetchApplications();
+        }
+        return current;
+      });
+    }, 5000);
     return () => clearInterval(timer);
-  }, [filter, applications]);
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

@@ -39,7 +39,10 @@ async def generate_interview_questions(
     if resume_id:
         resume = await Resume.get(resume_id)
     if not resume:
-        resume = await Resume.find(Resume.is_active == True).sort([("created_at", -1)]).first_or_none()
+        resume = await Resume.find(
+            Resume.user_id.id == current_user.id,
+            Resume.is_active == True
+        ).sort([("created_at", -1)]).first_or_none()
 
     try:
         questions = await interview_coach.generate_questions(job, resume)
@@ -66,7 +69,10 @@ async def evaluate_interview_answer(
     if request.resume_id:
         resume = await Resume.get(request.resume_id)
     if not resume:
-        resume = await Resume.find(Resume.is_active == True).sort([("created_at", -1)]).first_or_none()
+        resume = await Resume.find(
+            Resume.user_id.id == current_user.id,
+            Resume.is_active == True
+        ).sort([("created_at", -1)]).first_or_none()
 
     try:
         evaluation = await interview_coach.evaluate_answer(request.question, request.answer, job, resume)

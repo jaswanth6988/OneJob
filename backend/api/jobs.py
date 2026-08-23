@@ -19,27 +19,36 @@ async def list_jobs(
     source: Optional[str] = None,
     search: Optional[str] = None,
     location: Optional[str] = None,
+    remote_type: Optional[str] = None,
+    sort_by: Optional[str] = Query("score", description="Sort by 'score' or 'latest'"),
     current_user: UserProfile = Depends(get_current_user)
 ):
     """List jobs with pagination and filters"""
-    query = {}
+    filters = []
     
     if status:
-        query["status"] = status
+        filters.append(JobPosting.status == status)
     if min_score is not None:
-        query["score"] = {"$gte": min_score}
+        filters.append(JobPosting.score >= min_score)
     if source:
-        query["source_name"] = source
+        filters.append(JobPosting.source_name == source)
     if search:
-        query["title"] = {"$regex": f".*{search}.*", "$options": "i"}
+        filters.append(RegEx(JobPosting.title, f".*{search}.*", "i"))
     if location:
-        query["location"] = {"$regex": f".*{location}.*", "$options": "i"}
+        filters.append(RegEx(JobPosting.location, f".*{location}.*", "i"))
+    if remote_type:
+        filters.append(JobPosting.remote_type == remote_type)
 
     # Execute query
-    total = await JobPosting.find(query).count()
+    find_query = JobPosting.find(*filters) if filters else JobPosting.find_all()
+    total = await find_query.count()
     
-    # Sort by score desc, then created_at desc
-    jobs = await JobPosting.find(query).sort([("score", -1), ("created_at", -1)]).skip((page - 1) * page_size).limit(page_size).to_list()
+    # Sort
+    sort_opts = [("score", -1), ("created_at", -1)]
+    if sort_by == "latest":
+        sort_opts = [("created_at", -1)]
+        
+    jobs = await find_query.sort(sort_opts).skip((page - 1) * page_size).limit(page_size).to_list()
     
     return APIResponse(
         success=True,
@@ -52,19 +61,9 @@ async def list_jobs(
         )
     )
 
-@router.get("/{id}", response_model=APIResponse[JobResponse])
-async def get_job(id: str, current_user: UserProfile = Depends(get_current_user)):
-    """Get a single job by ID"""
-    job = await JobPosting.get(id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-        
-    return APIResponse(success=True, data=JobResponse.model_validate(job.model_dump(by_alias=True, mode="json")))
-
 @router.post("/crawl", response_model=APIResponse[str])
 async def trigger_crawl(current_user: UserProfile = Depends(get_current_user)):
     """Manually trigger a crawl task"""
-    # Only allow if we have celery configured. For now we will invoke the task asynchronously.
     try:
         from backend.workers.crawlers import crawl_all_sources
         crawl_all_sources.delay()
@@ -81,3 +80,13 @@ async def trigger_score(current_user: UserProfile = Depends(get_current_user)):
         return APIResponse(success=True, message="Scoring task started in the background")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{id}", response_model=APIResponse[JobResponse])
+async def get_job(id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Get a single job by ID"""
+    job = await JobPosting.get(id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    return APIResponse(success=True, data=JobResponse.model_validate(job.model_dump(by_alias=True, mode="json")))
+

@@ -1,5 +1,6 @@
 import os
 import aiofiles
+import asyncio
 from typing import List
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -33,7 +34,7 @@ async def upload_resume(
     os.makedirs(settings.STORAGE_RESUMES, exist_ok=True)
     
     # Save file
-    file_id = f"{current_user.id}_{datetime.now().timestamp()}_{filename}"
+    file_id = f"{current_user.id}_{datetime.now(timezone.utc).timestamp()}_{filename}"
     file_path = os.path.join(settings.STORAGE_RESUMES, file_id)
     
     try:
@@ -41,8 +42,9 @@ async def upload_resume(
             content = await file.read()
             await f.write(content)
             
-        # Parse resume
-        parsed_data = parse_resume(file_path, ext)
+        # Parse resume asynchronously
+        loop = asyncio.get_event_loop()
+        parsed_data = await loop.run_in_executor(None, parse_resume, file_path, ext)
         
         # Create DB record
         resume = Resume(
@@ -83,8 +85,18 @@ async def list_resumes(current_user: UserProfile = Depends(get_current_user)):
 
 @router.get("/{id}", response_model=APIResponse[ResumeResponse])
 async def get_resume(id: str, current_user: UserProfile = Depends(get_current_user)):
-    resume = await Resume.get(id)
-    if not resume or resume.user_id.id != current_user.id or not resume.is_active:
+    from beanie import PydanticObjectId
+    try:
+        obj_id = PydanticObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid resume ID format")
+
+    resume = await Resume.find_one(
+        Resume.id == obj_id,
+        Resume.user_id.id == current_user.id,
+        Resume.is_active == True
+    )
+    if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
         
     return APIResponse(
@@ -98,14 +110,25 @@ async def update_resume(
     update_data: ResumeUpdate,
     current_user: UserProfile = Depends(get_current_user)
 ):
-    resume = await Resume.get(id)
-    if not resume or resume.user_id.id != current_user.id or not resume.is_active:
+    from beanie import PydanticObjectId
+    try:
+        obj_id = PydanticObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid resume ID format")
+
+    resume = await Resume.find_one(
+        Resume.id == obj_id,
+        Resume.user_id.id == current_user.id,
+        Resume.is_active == True
+    )
+    if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
         
     data = update_data.model_dump(exclude_unset=True)
     if data:
         data["updated_at"] = datetime.now(timezone.utc)
         await resume.set(data)
+        resume = await Resume.get(id) # Re-fetch to get updated fields
         
     return APIResponse(
         success=True,

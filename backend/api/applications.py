@@ -24,11 +24,11 @@ async def list_applications(
     current_user: UserProfile = Depends(get_current_user)
 ):
     """List all job applications for the authenticated user."""
-    query = {"user_id._id": PydanticObjectId(current_user.id)} if hasattr(current_user, "id") else {}
+    filters = [JobApplication.user_id.id == current_user.id]
     if status:
-        query["status"] = status
+        filters.append(JobApplication.status == status)
         
-    apps = await JobApplication.find(query).sort([("updated_at", -1)]).limit(limit).to_list()
+    apps = await JobApplication.find(*filters).sort([("updated_at", -1)]).limit(limit).to_list()
     
     # Clean serialization for ObjectId fields to prevent Pydantic 500 errors
     items = []
@@ -61,7 +61,10 @@ async def start_job_application(
     if request_data and request_data.resume_id:
         resume = await Resume.get(request_data.resume_id)
     if not resume:
-        resume = await Resume.find(Resume.is_active == True).sort([("created_at", -1)]).first_or_none()
+        resume = await Resume.find(
+            Resume.user_id.id == current_user.id, 
+            Resume.is_active == True
+        ).sort([("created_at", -1)]).first_or_none()
 
     # Create new Application tracker record
     application = JobApplication(

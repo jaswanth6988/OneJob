@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
 import { ArrowLeft, Building, MapPin, Globe, Sparkles, ExternalLink, Clock, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -193,7 +193,7 @@ export default function JobDetailPage() {
 
                 {job.match_result?.reason && (
                   <div className="text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-                    "{job.match_result.reason}"
+                    {`"${job.match_result.reason}"`}
                   </div>
                 )}
 
@@ -232,7 +232,17 @@ export default function JobDetailPage() {
             ) : (
               <div className="text-center py-8">
                 <p className="text-slate-400 text-sm mb-4">This job hasn't been scored by the AI yet.</p>
-                <button className="px-4 py-2 text-sm rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.post('/jobs/score', {});
+                      setTimeout(async () => {
+                        const res = await api.get(`/jobs/${params.id}`);
+                        setJob(res.data);
+                      }, 3000);
+                    } catch(e) { console.error(e); }
+                  }}
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
                   Run Analysis
                 </button>
               </div>

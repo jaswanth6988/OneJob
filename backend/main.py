@@ -19,6 +19,7 @@ from backend.api.applications import router as applications_router
 from backend.api.tailor import router as tailor_router
 from backend.api.interview import router as interview_router
 from backend.api.chat import router as chat_router
+from backend.api.preferences import router as preferences_router
 
 logger = get_logger(__name__)
 
@@ -72,6 +73,7 @@ app.include_router(applications_router, prefix="/api/applications", tags=["Appli
 app.include_router(tailor_router, prefix="/api/tailor", tags=["Resume Tailor"])
 app.include_router(interview_router, prefix="/api/interview", tags=["Interview Prep"])
 app.include_router(chat_router, prefix="/api/chat", tags=["AI Chat"])
+app.include_router(preferences_router, prefix="/api/preferences", tags=["Preferences"])
 
 # Mount static storage for screenshots & resumes
 os.makedirs("storage", exist_ok=True)

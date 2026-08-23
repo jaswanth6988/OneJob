@@ -1,120 +1,118 @@
 import json
+import httpx
 import logging
-import google.generativeai as genai
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List
+from datetime import datetime, timezone
 
 from backend.core.config import settings
 from backend.models.job import JobPosting, JobStatus
 from backend.models.resume import Resume
-from backend.models.ai_event import AIEventLog
 
 logger = logging.getLogger(__name__)
 
-# Configure Gemini
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
-class AIMatchOutput(BaseModel):
-    score: int = Field(description="Match score from 0 to 100")
-    matched_skills: List[str] = Field(description="List of skills that perfectly match the job requirements")
-    missing_skills: List[str] = Field(description="List of critical skills required by the job that are missing from the resume")
-    confidence_reasoning: str = Field(description="Brief explanation (1-2 sentences) of why this score was given")
-    recommended_resume_id: Optional[str] = Field(description="The ID of the best matching resume if multiple were provided, otherwise the ID of the single resume", default=None)
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 
 
 class AIMatcherService:
-    def __init__(self):
-        self.model = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
-            generation_config={"response_mime_type": "application/json"}
-        )
+    """
+    Scores job postings against candidate resumes using Gemini REST API.
+    Uses pure async HTTP — no gRPC SDK, fully Windows Defender compliant.
+    """
 
     async def score_job(self, job: JobPosting, resumes: List[Resume]) -> JobPosting:
-        """
-        Scores a job against a list of resumes using Gemini.
-        Updates the job's score, status, and match_result in place.
-        """
         if not resumes:
             logger.warning(f"No resumes provided to score job {job.id}")
             return job
 
         if not settings.GEMINI_API_KEY:
-            logger.warning("GEMINI_API_KEY is missing. Skipping AI scoring.")
+            logger.warning("GEMINI_API_KEY missing. Skipping AI scoring.")
             return job
 
+        # Build resume context
         resume_context = ""
         for r in resumes:
-            resume_context += f"--- Resume ID: {r.id} | Title: {r.title} ---\n"
+            resume_context += f"--- Resume: {r.title} ---\n"
             resume_context += f"Skills: {', '.join(r.skills)}\n"
-            resume_context += "Experience:\n"
-            for exp in r.experience:
-                resume_context += f" - {exp.get('title')} at {exp.get('company')} ({exp.get('duration')})\n"
-                for bullet in exp.get('bullets', []):
-                    resume_context += f"   * {bullet}\n"
+            if r.experience:
+                resume_context += "Experience:\n"
+                for exp in r.experience[:3]:
+                    resume_context += f"  - {exp.get('title', '')} at {exp.get('company', '')} ({exp.get('duration', '')})\n"
             resume_context += "\n"
 
-        prompt = f"""
-        You are an expert ATS (Applicant Tracking System) AI assistant.
-        Your task is to evaluate how well the candidate's resume(s) match the given job description.
+        prompt = f"""You are an expert ATS (Applicant Tracking System) AI assistant.
+Evaluate how well the candidate's resume matches the job description.
 
-        JOB DETAILS:
-        Title: {job.title}
-        Company: {job.company}
-        Description:
-        {job.description}
+JOB:
+Title: {job.title}
+Company: {job.company}
+Description: {job.description[:1500]}
 
-        CANDIDATE RESUMES:
-        {resume_context}
+CANDIDATE RESUME:
+{resume_context}
 
-        Evaluate the match and return a strict JSON object matching this schema:
-        {{
-            "score": integer (0 to 100),
-            "matched_skills": [string],
-            "missing_skills": [string],
-            "confidence_reasoning": string,
-            "recommended_resume_id": string (the ID of the resume that best matches)
-        }}
-        """
+Return ONLY a strict JSON object:
+{{
+  "score": integer (0 to 100),
+  "matched_skills": [list of strings — skills candidate has that match the job],
+  "missing_skills": [list of strings — critical skills required but missing from resume],
+  "confidence_reasoning": string (1-2 sentence explanation of the score)
+}}"""
+
+        url = GEMINI_URL.format(
+            model=settings.GEMINI_MODEL or "gemini-2.0-flash",
+            key=settings.GEMINI_API_KEY
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"response_mime_type": "application/json"}
+        }
 
         try:
-            # We use synchronous generate_content because the async version is not always stable
-            # in the genai SDK, but we wrap it in a try-except
-            response = self.model.generate_content(prompt)
-            
-            # The response is guaranteed to be JSON due to response_mime_type config
-            result_data = json.loads(response.text)
-            
-            # Validate with Pydantic
-            validated = AIMatchOutput(**result_data)
-            
-            # Update the job
-            job.score = float(validated.score)
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(url, json=payload)
+
+            if resp.status_code == 429:
+                # Quota exhausted — leave job as NEW so it retries next time
+                logger.warning(f"Gemini quota exceeded scoring job {job.id}. Will retry next cycle.")
+                return job  # Status stays NEW
+
+            if resp.status_code != 200:
+                logger.error(f"Gemini HTTP {resp.status_code} scoring job {job.id}: {resp.text[:200]}")
+                return job  # Status stays NEW on any API error
+
+            raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            result_data = json.loads(raw_text)
+
+            score = float(result_data.get("score", 0))
+            matched = result_data.get("matched_skills", [])
+            missing = result_data.get("missing_skills", [])
+            reason = result_data.get("confidence_reasoning", "")
+
+            job.score = score
             job.match_result = {
-                "matched_skills": validated.matched_skills,
-                "missing_skills": validated.missing_skills,
-                "confidence": 0.95, # High confidence if structured parsing succeeded
-                "reason": validated.confidence_reasoning,
-                "recommended_resume_id": validated.recommended_resume_id
+                "matched_skills": matched,
+                "missing_skills": missing,
+                "reason": reason,
+                "confidence": 0.95,
             }
-            
-            # Update status based on thresholds
-            if job.score >= settings.SCORE_AUTO_APPLY:
-                # If we want to auto-apply later, we might set it to APPLYING
+
+            # Update status based on score thresholds
+            if score >= settings.SCORE_MATCHED:
                 job.status = JobStatus.MATCHED
-            elif job.score >= settings.SCORE_MATCHED:
-                job.status = JobStatus.MATCHED
-            elif job.score >= settings.SCORE_PARTIAL:
+            elif score >= settings.SCORE_PARTIAL:
                 job.status = JobStatus.PARTIAL_MATCHED
             else:
                 job.status = JobStatus.SKIPPED
-                
-            return job
-            
-        except Exception as e:
-            logger.error(f"Error scoring job {job.id} with Gemini: {str(e)}")
-            job.status = JobStatus.FAILED
-            job.match_result = {"error": str(e)}
+
+            logger.info(f"Scored '{job.title}' → {score}/100 ({job.status})")
             return job
 
-# Singleton instance
+        except json.JSONDecodeError as je:
+            logger.error(f"Failed to parse Gemini JSON for job {job.id}: {je}")
+            return job  # Stay NEW — don't mark FAILED on parse error
+        except Exception as e:
+            logger.error(f"Unexpected error scoring job {job.id}: {e}")
+            return job  # Stay NEW — retry next cycle
+
+
 ai_matcher = AIMatcherService()

@@ -45,7 +45,10 @@ async def chat(
 
     resume_context = ""
     try:
-        resume = await Resume.find(Resume.is_active == True).sort([("created_at", -1)]).first_or_none()
+        resume = await Resume.find(
+            Resume.user_id.id == current_user.id,
+            Resume.is_active == True
+        ).sort([("created_at", -1)]).first_or_none()
         if resume:
             skills_str = ", ".join(resume.skills[:15]) if resume.skills else "Not specified"
             resume_context = f"\n\nCANDIDATE CONTEXT:\nResume: {resume.title}\nSkills: {skills_str}"
@@ -76,13 +79,13 @@ async def chat(
                 reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
                 return APIResponse(success=True, data={"reply": reply})
             logger.warning(f"Gemini chat API {resp.status_code}: {resp.text[:200]}")
-            return APIResponse(
-                success=True,
-                data={"reply": "I'm having trouble reaching the AI service right now. Please try again shortly."}
-            )
+        return APIResponse(
+            success=False,
+            message="I'm having trouble reaching the AI service right now. Please try again shortly."
+        )
     except Exception as e:
         logger.error(f"Chat API error: {e}")
         return APIResponse(
-            success=True,
-            data={"reply": "I'm temporarily unavailable. Please check your connection and try again."}
+            success=False,
+            message="I'm temporarily unavailable. Please check your connection and try again."
         )

@@ -32,7 +32,10 @@ async def tailor_resume_for_job(
     if resume_id:
         resume = await Resume.get(resume_id)
     if not resume:
-        resume = await Resume.find(Resume.is_active == True).sort([("created_at", -1)]).first_or_none()
+        resume = await Resume.find(
+            Resume.user_id.id == current_user.id,
+            Resume.is_active == True
+        ).sort([("created_at", -1)]).first_or_none()
 
     if not resume:
         raise HTTPException(status_code=404, detail="No active resume found. Please upload a resume first.")
