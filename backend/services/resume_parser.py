@@ -4,9 +4,9 @@ from typing import Dict, List, Any
 import fitz  # PyMuPDF
 import docx
 import json
-import httpx
 from backend.schemas.resume import ResumeParsedData
 from backend.core.config import settings
+from backend.core.llm import generate_content
 
 def parse_pdf(file_path: str) -> str:
     text = ""
@@ -76,17 +76,10 @@ async def extract_sections(text: str) -> Dict[str, Any]:
     {text[:8000]}
     """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL or 'gemini-2.0-flash'}:generateContent?key={settings.GEMINI_API_KEY}"
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
-            if resp.status_code == 200:
-                reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                if reply.startswith("```json"):
-                    reply = reply[7:-3]
-                elif reply.startswith("```"):
-                    reply = reply[3:-3]
-                return json.loads(reply)
+        result = await generate_content(prompt, json_response=True)
+        if result:
+            return result
     except Exception as e:
         print(f"Failed to extract sections with AI: {e}")
         

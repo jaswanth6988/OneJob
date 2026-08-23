@@ -1,5 +1,4 @@
-import httpx
-import json
+from backend.core.llm import generate_content
 import logging
 from typing import Optional, Dict, Any
 
@@ -9,35 +8,7 @@ from backend.models.resume import Resume
 
 logger = logging.getLogger(__name__)
 
-GEMINI_REST_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 
-async def _call_gemini(prompt: str, json_mode: bool = False) -> str:
-    """Pure async HTTP REST call to Gemini — no gRPC, WDAC-safe."""
-    if not settings.GEMINI_API_KEY:
-        return ""
-    
-    url = GEMINI_REST_URL.format(
-        model=settings.GEMINI_MODEL or "gemini-2.0-flash",
-        key=settings.GEMINI_API_KEY
-    )
-    payload: Dict[str, Any] = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    if json_mode:
-        payload["generationConfig"] = {"response_mime_type": "application/json"}
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            else:
-                logger.warning(f"Gemini API {resp.status_code}: {resp.text[:300]}")
-                return ""
-    except Exception as e:
-        logger.error(f"Gemini REST call failed: {e}")
-        return ""
 
 
 class ResumeTailorService:
@@ -88,12 +59,11 @@ Return a strict JSON object with EXACTLY these fields:
 }}
         """
 
-        raw = await _call_gemini(prompt, json_mode=True)
-        if not raw:
-            return self._fallback_response(resume, job)
-
         try:
-            result = json.loads(raw)
+            result = await generate_content(prompt, json_response=True, max_retries=2)
+            if not result:
+                return self._fallback_response(resume, job)
+
             # Validate required keys exist
             required = ["tailored_ats_score", "summary_rewrite", "skills_to_add", "keyword_gaps", "overall_advice"]
             for key in required:
@@ -101,7 +71,7 @@ Return a strict JSON object with EXACTLY these fields:
                     raise ValueError(f"Missing key: {key}")
             return result
         except Exception as e:
-            logger.error(f"Failed to parse tailor response: {e}. Raw: {raw[:300]}")
+            logger.error(f"Failed to parse tailor response: {e}")
             return self._fallback_response(resume, job)
 
     def _fallback_response(self, resume: Resume, job: JobPosting) -> Dict[str, Any]:

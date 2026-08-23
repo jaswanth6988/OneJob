@@ -1,5 +1,5 @@
 import json
-import httpx
+from backend.core.llm import generate_content
 import logging
 from typing import List
 from datetime import datetime, timezone
@@ -10,7 +10,6 @@ from backend.models.resume import Resume
 
 logger = logging.getLogger(__name__)
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 
 
 class AIMatcherService:
@@ -58,30 +57,12 @@ Return ONLY a strict JSON object:
   "confidence_reasoning": string (1-2 sentence explanation of the score)
 }}"""
 
-        url = GEMINI_URL.format(
-            model=settings.GEMINI_MODEL or "gemini-2.0-flash",
-            key=settings.GEMINI_API_KEY
-        )
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"response_mime_type": "application/json"}
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.post(url, json=payload)
-
-            if resp.status_code == 429:
-                # Quota exhausted — leave job as NEW so it retries next time
-                logger.warning(f"Gemini quota exceeded scoring job {job.id}. Will retry next cycle.")
-                return job  # Status stays NEW
-
-            if resp.status_code != 200:
-                logger.error(f"Gemini HTTP {resp.status_code} scoring job {job.id}: {resp.text[:200]}")
-                return job  # Status stays NEW on any API error
-
-            raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            result_data = json.loads(raw_text)
+            result_data = await generate_content(prompt, json_response=True, max_retries=3)
+            
+            if not result_data:
+                logger.warning(f"Failed to score job {job.id} (likely rate limited). Will retry next cycle.")
+                return job # Stays NEW
 
             score = float(result_data.get("score", 0))
             matched = result_data.get("matched_skills", [])
@@ -107,9 +88,6 @@ Return ONLY a strict JSON object:
             logger.info(f"Scored '{job.title}' → {score}/100 ({job.status})")
             return job
 
-        except json.JSONDecodeError as je:
-            logger.error(f"Failed to parse Gemini JSON for job {job.id}: {je}")
-            return job  # Stay NEW — don't mark FAILED on parse error
         except Exception as e:
             logger.error(f"Unexpected error scoring job {job.id}: {e}")
             return job  # Stay NEW — retry next cycle

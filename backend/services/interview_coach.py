@@ -1,5 +1,4 @@
-import httpx
-import json
+from backend.core.llm import generate_content
 import logging
 from typing import Optional, Dict, Any, List
 
@@ -9,28 +8,6 @@ from backend.models.resume import Resume
 
 logger = logging.getLogger(__name__)
 
-GEMINI_REST_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-
-async def _call_gemini(prompt: str, json_mode: bool = False) -> str:
-    if not settings.GEMINI_API_KEY:
-        return ""
-    url = GEMINI_REST_URL.format(
-        model=settings.GEMINI_MODEL or "gemini-2.0-flash",
-        key=settings.GEMINI_API_KEY
-    )
-    payload: Dict[str, Any] = {"contents": [{"parts": [{"text": prompt}]}]}
-    if json_mode:
-        payload["generationConfig"] = {"response_mime_type": "application/json"}
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code == 200:
-                return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            logger.warning(f"Gemini API {resp.status_code}: {resp.text[:200]}")
-            return ""
-    except Exception as e:
-        logger.error(f"Gemini REST call failed: {e}")
-        return ""
 
 
 class InterviewCoachService:
@@ -77,12 +54,9 @@ Return a strict JSON array of 9 question objects with EXACTLY these fields:
 ]
 """
 
-        raw = await _call_gemini(prompt, json_mode=True)
-        if not raw:
-            return self._fallback_questions(job)
         try:
-            result = json.loads(raw)
-            if isinstance(result, list) and len(result) > 0:
+            result = await generate_content(prompt, json_response=True, max_retries=2)
+            if result and isinstance(result, list) and len(result) > 0:
                 return result
             return self._fallback_questions(job)
         except Exception as e:
@@ -125,11 +99,11 @@ Evaluate this answer rigorously but fairly. Return a strict JSON object:
 }}
 """
 
-        raw = await _call_gemini(prompt, json_mode=True)
-        if not raw:
-            return self._fallback_evaluation(candidate_answer)
         try:
-            result = json.loads(raw)
+            result = await generate_content(prompt, json_response=True, max_retries=2)
+            if not result:
+                return self._fallback_evaluation(candidate_answer)
+                
             required = ["score", "verdict", "model_answer"]
             for k in required:
                 if k not in result:

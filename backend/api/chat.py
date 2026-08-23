@@ -1,4 +1,3 @@
-import httpx
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,8 +23,8 @@ class ChatRequest(BaseModel):
     history: Optional[List[ChatMessage]] = []
 
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-
+from backend.schemas.common import APIResponse
+from backend.core.llm import generate_content
 SYSTEM_CONTEXT = (
     "You are an expert AI career coach embedded inside an AI-powered Job Application Portal. "
     "You help candidates with resume writing, interview preparation, job search strategy, salary negotiation, "
@@ -67,25 +66,12 @@ async def chat(
         f"User: {request.message}\nAssistant:"
     )
 
-    url = GEMINI_URL.format(
-        model=settings.GEMINI_MODEL or "gemini-2.0-flash",
-        key=settings.GEMINI_API_KEY
-    )
-
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
-            if resp.status_code == 200:
-                reply = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return APIResponse(success=True, data={"reply": reply})
-            logger.warning(f"Gemini chat API {resp.status_code}: {resp.text[:200]}")
+    reply = await generate_content(prompt)
+    
+    if reply:
+        return APIResponse(success=True, data={"reply": reply})
+    else:
         return APIResponse(
             success=False,
-            message="I'm having trouble reaching the AI service right now. Please try again shortly."
-        )
-    except Exception as e:
-        logger.error(f"Chat API error: {e}")
-        return APIResponse(
-            success=False,
-            message="I'm temporarily unavailable. Please check your connection and try again."
+            message="I'm temporarily unavailable or experiencing high traffic. Please try again shortly."
         )

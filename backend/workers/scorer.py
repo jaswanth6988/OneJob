@@ -34,6 +34,11 @@ async def _async_score_new_jobs():
             # Save it back
             await updated_job.save()
             scored_count += 1
+            
+            # Be polite to the API, but rely on backend.core.llm's exponential backoff for actual rate limits
+            import asyncio
+            await asyncio.sleep(1.0) 
+            
         except Exception as e:
             logger.error(f"Error saving scored job {job.id}: {e}")
             
