@@ -14,6 +14,7 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [scoring, setScoring] = useState(false);
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
   const handleAIApply = async (mode: 'DRY_RUN' | 'LIVE' = 'DRY_RUN') => {
@@ -234,16 +235,17 @@ export default function JobDetailPage() {
                 <p className="text-slate-400 text-sm mb-4">This job hasn't been scored by the AI yet.</p>
                 <button
                   onClick={async () => {
+                    setScoring(true);
                     try {
-                      await api.post('/jobs/score', {});
-                      setTimeout(async () => {
-                        const res = await api.get(`/jobs/${params.id}`);
-                        setJob(res.data);
-                      }, 3000);
+                      const res = await api.post(`/jobs/${params.id}/score`, {});
+                      setJob(res.data);
                     } catch(e) { console.error(e); }
+                    finally { setScoring(false); }
                   }}
-                  className="px-4 py-2 text-sm rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
-                  Run Analysis
+                  disabled={scoring}
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50 flex items-center justify-center mx-auto">
+                  {scoring ? <Sparkles className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  {scoring ? "Scoring..." : "Run Analysis"}
                 </button>
               </div>
             )}

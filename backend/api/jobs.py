@@ -95,3 +95,24 @@ async def get_job(id: str, current_user: UserProfile = Depends(get_current_user)
         
     return APIResponse(success=True, data=JobResponse.model_validate(job.model_dump(by_alias=True, mode="json")))
 
+@router.post("/{id}/score", response_model=APIResponse[JobResponse])
+async def score_single_job(id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Synchronously score a single job"""
+    job = await JobPosting.get(id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    from backend.models.resume import Resume
+    from backend.services.ai_matcher import ai_matcher
+    
+    active_resumes = await Resume.find(Resume.is_active == True).to_list()
+    if not active_resumes:
+        raise HTTPException(status_code=400, detail="No active resumes found. Upload and activate a resume first.")
+        
+    try:
+        updated_job = await ai_matcher.score_job(job, active_resumes)
+        await updated_job.save()
+        return APIResponse(success=True, data=JobResponse.model_validate(updated_job.model_dump(by_alias=True, mode="json")))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scoring failed: {str(e)}")
+

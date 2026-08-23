@@ -28,8 +28,9 @@ class LinkedInConnector(BaseJobConnector):
         limit: int = 50,
     ) -> AsyncGenerator[Dict, None]:
         
-        # Build query string
-        query = " ".join(keywords) if keywords else "software engineer"
+        # Build query string using ONLY the primary keyword (index 0) 
+        # so LinkedIn's search engine isn't confused by a massive 20-word string
+        query = keywords[0] if keywords else "software engineer"
         if remote_only:
             query += " remote"
             
