@@ -2,6 +2,7 @@ import logging
 from backend.core.celery_app import celery_app, run_async
 from backend.core.database import init_db, close_db
 from backend.connectors.remoteok import RemoteOKConnector
+from backend.connectors.linkedin import LinkedInConnector
 from backend.connectors.adzuna import AdzunaConnector
 from backend.connectors.remotive import RemotiveConnector
 from backend.connectors.jobicy import JobicyConnector
@@ -18,6 +19,9 @@ async def _async_crawl_all_sources(search_query: str = None):
 
     total_new_jobs = 0
     connectors = [
+        LinkedInConnector(),
+        RssConnector("FoundIt Freshers India", "https://www.foundit.in/rss/fresher-jobs.xml", RemoteType.UNKNOWN),
+        RssConnector("FoundIt IT India", "https://www.foundit.in/rss/it-software-software-services-jobs.xml", RemoteType.UNKNOWN),
         RemoteOKConnector(),
         RemotiveConnector(),
         AdzunaConnector(),
@@ -59,7 +63,7 @@ async def _async_crawl_all_sources(search_query: str = None):
     except Exception as e:
         logger.warning(f"Could not load personalized keywords: {e}")
 
-    for connector in connectors:
+    async def _crawl_single(connector):
         logger.info(f"Starting crawl for {connector.source_name}")
         try:
             count = await job_manager.save_jobs_from_connector(
@@ -67,9 +71,14 @@ async def _async_crawl_all_sources(search_query: str = None):
                 keywords=default_keywords,
             )
             logger.info(f"Saved {count} new jobs from {connector.source_name}")
-            total_new_jobs += count
+            return count
         except Exception as e:
             logger.error(f"Failed crawling {connector.source_name}: {e}")
+            return 0
+
+    import asyncio
+    results = await asyncio.gather(*[_crawl_single(c) for c in connectors])
+    total_new_jobs = sum(results)
 
     await close_db()
     return total_new_jobs

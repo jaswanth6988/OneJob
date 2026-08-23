@@ -36,7 +36,15 @@ class RemoteOKConnector(BaseJobConnector):
                 data = response.json()
                 
                 # RemoteOK API returns an array where the first element is legal info
-                jobs = [j for j in data if j.get("id") and j.get("company")]
+                jobs = []
+                for j in data:
+                    if j.get("id") and j.get("company") and j.get("position"):
+                        title = j.get("position", "").lower()
+                        desc = j.get("description", "")
+                        # Filter out known RemoteOK garbage
+                        if "page not found" in title or "why do you want this new job" in title or len(desc) < 50:
+                            continue
+                        jobs.append(j)
                 
                 # Filter locally based on keywords
                 if keywords:

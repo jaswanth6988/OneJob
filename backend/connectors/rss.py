@@ -1,7 +1,7 @@
 import httpx
 import logging
 from typing import AsyncGenerator, Dict, List, Optional
-import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 import re
 from backend.models.job import JobPosting, RemoteType, JobStatus
 from backend.connectors.base import BaseJobConnector
@@ -30,14 +30,14 @@ class RssConnector(BaseJobConnector):
                 response = await client.get(self.feed_url)
                 response.raise_for_status()
                 
-                root = ET.fromstring(response.content)
-                items = root.findall(".//item")[:limit]
+                soup = BeautifulSoup(response.content, "xml")
+                items = soup.find_all("item")[:limit]
                 for item in items:
-                    title = item.findtext("title", "")
-                    link = item.findtext("link", "")
-                    desc = item.findtext("description", "")
-                    guid = item.findtext("guid", link)
-                    pub_date = item.findtext("pubDate", "")
+                    title = item.find("title").text if item.find("title") else ""
+                    link = item.find("link").text if item.find("link") else ""
+                    desc = item.find("description").text if item.find("description") else ""
+                    guid = item.find("guid").text if item.find("guid") else link
+                    pub_date = item.find("pubDate").text if item.find("pubDate") else ""
                     
                     yield {
                         "title": title,

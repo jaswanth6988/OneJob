@@ -263,7 +263,7 @@ export default function JobsPage() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {jobs.map((job) => (
-              <Link key={job.id} href={`/jobs/${job.id}`}>
+              <Link key={job.id || job._id} href={`/jobs/${job.id || job._id}`}>
                 <Card className="h-full p-5 bg-slate-900/50 border-slate-800 hover:border-slate-500 hover:bg-slate-800/60 transition-all duration-200 cursor-pointer group flex flex-col">
                   <div className="flex justify-between items-start gap-2 mb-3">
                     <div className="flex-1 min-w-0">
