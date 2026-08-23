@@ -42,9 +42,8 @@ async def upload_resume(
             content = await file.read()
             await f.write(content)
             
-        # Parse resume asynchronously
-        loop = asyncio.get_event_loop()
-        parsed_data = await loop.run_in_executor(None, parse_resume, file_path, ext)
+        # Parse resume (uses AI for extraction and runs PDF parsing in executor internally)
+        parsed_data = await parse_resume(file_path, ext)
         
         # Create DB record
         resume = Resume(

@@ -13,7 +13,7 @@ from backend.services.job_manager import job_manager
 logger = logging.getLogger(__name__)
 
 
-async def _async_crawl_all_sources():
+async def _async_crawl_all_sources(search_query: str = None):
     await init_db()
 
     total_new_jobs = 0
@@ -51,6 +51,10 @@ async def _async_crawl_all_sources():
         if user and user.preferred_roles:
             default_keywords = list(dict.fromkeys(user.preferred_roles + default_keywords))[:20]
 
+        # Layer 3: Direct search query overrides all
+        if search_query and search_query.strip():
+            default_keywords = [search_query.strip()] + default_keywords
+
         logger.info(f"Crawling with personalized keywords: {default_keywords[:6]}...")
     except Exception as e:
         logger.warning(f"Could not load personalized keywords: {e}")
@@ -72,10 +76,10 @@ async def _async_crawl_all_sources():
 
 
 @celery_app.task(name="backend.workers.crawlers.crawl_all_sources")
-def crawl_all_sources():
+def crawl_all_sources(search_query: str = None):
     """Periodic task to crawl all configured job sources."""
-    logger.info("Crawl All Sources task started")
-    result = run_async(_async_crawl_all_sources())
+    logger.info(f"Crawl All Sources task started with search={search_query}")
+    result = run_async(_async_crawl_all_sources(search_query))
 
     from backend.workers.scorer import score_new_jobs
     score_new_jobs.delay()

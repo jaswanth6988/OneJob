@@ -76,7 +76,7 @@ export default function JobsPage() {
   const triggerCrawl = async () => {
     setCrawling(true);
     try {
-      await api.post("/jobs/crawl", {});
+      await api.post("/jobs/crawl", { search });
       setTimeout(fetchJobs, 4000);
     } finally { setCrawling(false); }
   };

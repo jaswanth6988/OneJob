@@ -7,6 +7,10 @@ from backend.models.user import UserProfile
 from backend.models.job import JobPosting, JobStatus
 from backend.schemas.common import PaginatedResponse, APIResponse
 from backend.schemas.job import JobFilters, JobResponse
+from pydantic import BaseModel
+
+class CrawlRequest(BaseModel):
+    search: Optional[str] = None
 
 router = APIRouter()
 
@@ -62,11 +66,12 @@ async def list_jobs(
     )
 
 @router.post("/crawl", response_model=APIResponse[str])
-async def trigger_crawl(current_user: UserProfile = Depends(get_current_user)):
+async def trigger_crawl(req: Optional[CrawlRequest] = None, current_user: UserProfile = Depends(get_current_user)):
     """Manually trigger a crawl task"""
     try:
         from backend.workers.crawlers import crawl_all_sources
-        crawl_all_sources.delay()
+        search_str = req.search if req else None
+        crawl_all_sources.delay(search_str)
         return APIResponse(success=True, message="Crawl task started in the background")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
