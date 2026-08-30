@@ -34,6 +34,7 @@ export default function JobsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Filters
+  const [globalSearch, setGlobalSearch] = useState("");
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("All Sources");
   const [remoteType, setRemoteType] = useState("");
@@ -55,16 +56,18 @@ export default function JobsPage() {
     return params.toString();
   }, [search, source, remoteType, minScore, status, sortBy, page]);
 
-  const fetchJobs = useCallback(async () => {
-    setLoading(true);
+  const fetchJobs = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get<any>(`/jobs?${buildQuery()}`);
       setJobs(res.data?.items || []);
       setTotal(res.data?.total || 0);
+      return res.data?.total || 0;
     } catch (e) {
       console.error(e);
+      return 0;
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [buildQuery]);
 
@@ -73,12 +76,30 @@ export default function JobsPage() {
     return () => clearTimeout(timer);
   }, [fetchJobs]);
 
-  const triggerCrawl = async () => {
+  const triggerCrawl = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (globalSearch) {
+      setSearch(globalSearch);
+      setPage(1);
+    }
     setCrawling(true);
     try {
-      await api.post("/jobs/crawl", { search });
-      setTimeout(fetchJobs, 4000);
-    } finally { setCrawling(false); }
+      await api.post("/jobs/crawl", { search: globalSearch });
+      
+      // Poll silently every 2.5 seconds for up to 45 seconds
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        const currentTotal = await fetchJobs(true);
+        // Stop polling if we found jobs, or if we hit the 45 second timeout
+        if (currentTotal > 0 || attempts >= 18) {
+          clearInterval(poll);
+          setCrawling(false);
+        }
+      }, 2500);
+    } catch (e) {
+      setCrawling(false);
+    }
   };
 
   const triggerScore = async () => {
@@ -148,20 +169,28 @@ export default function JobsPage() {
       </div>
 
       {/* Search bar */}
-      <div className="relative">
+      <form onSubmit={triggerCrawl} className="relative flex items-center">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
         <input
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search jobs by title, company, or keyword..."
-          className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-800/80 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors text-sm"
+          value={globalSearch}
+          onChange={e => setGlobalSearch(e.target.value)}
+          placeholder="Search the web for jobs by title, company, or keyword (Press Enter)..."
+          className="w-full pl-10 pr-32 py-3 rounded-xl bg-slate-800/80 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors text-sm"
         />
-        {search && (
-          <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+        {globalSearch && (
+          <button type="button" onClick={() => { setGlobalSearch(""); setSearch(""); setPage(1); }} className="absolute right-32 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white mr-2">
             <X className="w-4 h-4" />
           </button>
         )}
-      </div>
+        <button 
+          type="submit" 
+          disabled={crawling}
+          className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+          {crawling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+          Search Web
+        </button>
+      </form>
 
       {/* Advanced Filters Panel */}
       {showFilters && (
@@ -233,7 +262,7 @@ export default function JobsPage() {
       {/* Active filter badges */}
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2">
-          {search && <Badge className="bg-blue-500/15 text-blue-300 border-blue-500/30 gap-1">Search: {search} <button onClick={() => setSearch("")}><X className="w-3 h-3" /></button></Badge>}
+          {search && <Badge className="bg-blue-500/15 text-blue-300 border-blue-500/30 gap-1">Search: {search} <button onClick={() => { setSearch(""); setGlobalSearch(""); setPage(1); }}><X className="w-3 h-3" /></button></Badge>}
           {source !== "All Sources" && <Badge className="bg-slate-700 text-slate-200 border-slate-600 gap-1">{source} <button onClick={() => setSource("All Sources")}><X className="w-3 h-3" /></button></Badge>}
           {remoteType !== "" && <Badge className="bg-slate-700 text-slate-200 border-slate-600 gap-1">{REMOTE_TYPES.find(r => r.value === remoteType)?.label} <button onClick={() => setRemoteType("")}><X className="w-3 h-3" /></button></Badge>}
           {minScore > 0 && <Badge className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30 gap-1">{minScore}%+ score <button onClick={() => setMinScore(0)}><X className="w-3 h-3" /></button></Badge>}
@@ -242,7 +271,15 @@ export default function JobsPage() {
       )}
 
       {/* Job Grid */}
-      {loading ? (
+      {crawling ? (
+        <Card className="p-14 flex flex-col items-center text-center border-dashed border-slate-700 bg-slate-900/40">
+          <Loader2 className="w-12 h-12 text-blue-500 mb-4 animate-spin" />
+          <h3 className="text-xl font-semibold text-white mb-2">Searching the web...</h3>
+          <p className="text-slate-400 text-sm max-w-md mb-4">
+            Our AI is fetching the latest jobs for your query from LinkedIn and other sources. This usually takes about 5 to 10 seconds.
+          </p>
+        </Card>
+      ) : loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="h-44 animate-pulse bg-slate-800/50 border-slate-700/50" />

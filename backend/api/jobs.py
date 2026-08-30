@@ -37,7 +37,13 @@ async def list_jobs(
     if source:
         filters.append(JobPosting.source_name == source)
     if search:
-        filters.append(RegEx(JobPosting.title, f".*{search}.*", "i"))
+        from beanie.operators import Or
+        filters.append(
+            Or(
+                RegEx(JobPosting.title, f".*{search}.*", "i"),
+                RegEx(JobPosting.company, f".*{search}.*", "i")
+            )
+        )
     if location:
         filters.append(RegEx(JobPosting.location, f".*{location}.*", "i"))
     if remote_type:
