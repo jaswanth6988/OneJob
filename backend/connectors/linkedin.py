@@ -65,6 +65,14 @@ class LinkedInConnector(BaseJobConnector):
                         
                     title = title_elem.text.strip()
                     company = company_elem.text.strip() if company_elem else "Unknown Company"
+                    
+                    # Strict filtering to prevent LinkedIn from returning garbage unrelated jobs
+                    if keywords and len(keywords) > 0:
+                        primary_kw = keywords[0].lower()
+                        # If it's a generic default search (like "software engineer"), we bypass strict
+                        if primary_kw != "software engineer":
+                            if primary_kw not in title.lower() and primary_kw not in company.lower():
+                                continue
                     job_location = location_elem.text.strip() if location_elem else loc
                     link = link_elem.get('href', '').split('?')[0]  # Remove tracking params
                     

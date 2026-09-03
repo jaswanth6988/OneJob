@@ -84,19 +84,26 @@ export default function JobsPage() {
     }
     setCrawling(true);
     try {
-      await api.post("/jobs/crawl", { search: globalSearch });
+      const crawlRes = await api.post<any>("/jobs/crawl", { search: globalSearch });
+      const taskId = crawlRes.data?.data;
+      if (!taskId) throw new Error("No task ID");
       
-      // Poll silently every 2.5 seconds for up to 45 seconds
-      let attempts = 0;
+      // Poll the true status of the background task
       const poll = setInterval(async () => {
-        attempts++;
-        const currentTotal = await fetchJobs(true);
-        // Stop polling if we found jobs, or if we hit the 45 second timeout
-        if (currentTotal > 0 || attempts >= 18) {
+        try {
+          const statusRes = await api.get<any>(`/jobs/crawl/status/${taskId}`);
+          const status = statusRes.data?.data;
+          
+          if (status === "SUCCESS" || status === "FAILURE" || status === "REVOKED") {
+            clearInterval(poll);
+            await fetchJobs(true);
+            setCrawling(false);
+          }
+        } catch (err) {
           clearInterval(poll);
           setCrawling(false);
         }
-      }, 2500);
+      }, 2000);
     } catch (e) {
       setCrawling(false);
     }

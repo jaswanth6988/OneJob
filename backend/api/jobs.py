@@ -77,8 +77,18 @@ async def trigger_crawl(req: Optional[CrawlRequest] = None, current_user: UserPr
     try:
         from backend.workers.crawlers import crawl_all_sources
         search_str = req.search if req else None
-        crawl_all_sources.delay(search_str)
-        return APIResponse(success=True, message="Crawl task started in the background")
+        task = crawl_all_sources.delay(search_str)
+        return APIResponse(success=True, data=task.id, message="Crawl task started in the background")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/crawl/status/{task_id}", response_model=APIResponse[str])
+async def get_crawl_status(task_id: str, current_user: UserProfile = Depends(get_current_user)):
+    """Check status of a background crawl task"""
+    try:
+        from backend.core.celery_app import celery_app
+        res = celery_app.AsyncResult(task_id)
+        return APIResponse(success=True, data=res.status)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
