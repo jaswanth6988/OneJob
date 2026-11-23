@@ -1,8 +1,26 @@
 import { APIResponse, ErrorResponse, TokenResponse, UserProfile, Resume, ResumeListItem } from './types';
 
-const BASE_URL = 'http://localhost:8000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class ApiClient {
+  private refreshing: Promise<boolean> | null = null;
+  private async renewSession(): Promise<boolean> {
+    if (this.refreshing) return this.refreshing;
+    this.refreshing = (async () => {
+      const token = localStorage.getItem('refresh_token');
+      if (!token) return false;
+      try {
+        const response = await fetch(`${BASE_URL}/auth/refresh`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:token})});
+        if (!response.ok) return false;
+        const data = await response.json();
+        localStorage.setItem('token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        return true;
+      } catch { return false; }
+    })();
+    try { return await this.refreshing; } finally { this.refreshing = null; }
+  }
+
   private getHeaders() {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
@@ -11,7 +29,7 @@ class ApiClient {
     };
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, retried = false): Promise<T> {
     const url = `${BASE_URL}${endpoint}`;
     const headers = this.getHeaders();
     
@@ -25,12 +43,17 @@ class ApiClient {
 
     const response = await fetch(url, { ...options, headers: finalHeaders });
     
+    if (response.status === 401 && !retried && typeof window !== 'undefined' && await this.renewSession()) {
+      return this.request<T>(endpoint, options, true);
+    }
     if (!response.ok) {
       const error: ErrorResponse = await response.json().catch(() => ({ error: 'An error occurred' }));
-      throw new Error(error.error || `HTTP error! status: ${response.status}`);
+      if (response.status === 401 && typeof window !== 'undefined') { localStorage.removeItem('token'); window.dispatchEvent(new Event('auth-expired')); }
+      const detail = error.detail;
+      throw new Error(typeof detail === 'string' ? detail : error.error || `Request failed (${response.status}). Please try again.`);
     }
     
-    return response.json();
+    return response.status === 204 ? undefined as T : response.json();
   }
 
   async get<T>(endpoint: string): Promise<T> {
@@ -58,7 +81,7 @@ class ApiClient {
   auth = {
     register: (data: any) => this.post<APIResponse<TokenResponse>>('/auth/register', data),
     login: (data: any) => this.post<APIResponse<TokenResponse>>('/auth/login', data),
-    refresh: () => this.post<APIResponse<TokenResponse>>('/auth/refresh', {}),
+    refresh: () => this.renewSession(),
     getMe: () => this.get<APIResponse<UserProfile>>('/auth/me'),
   };
 

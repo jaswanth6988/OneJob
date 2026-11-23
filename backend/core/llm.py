@@ -21,18 +21,20 @@ async def generate_content(
         logger.error("GEMINI_API_KEY not configured.")
         return {} if json_response else ""
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL or 'gemini-3.6-flash'}:generateContent?key={settings.GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL or 'gemini-3.6-flash'}:generateContent"
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}]
     }
     
+    if json_response:
+        payload["generationConfig"] = {"responseMimeType": "application/json"}
     base_delay = 2.0
     
     async with httpx.AsyncClient(timeout=timeout) as client:
         for attempt in range(max_retries + 1):
             try:
-                resp = await client.post(url, json=payload)
+                resp = await client.post(url, json=payload, headers={"x-goog-api-key": settings.GEMINI_API_KEY})
                 
                 # Success
                 if resp.status_code == 200:

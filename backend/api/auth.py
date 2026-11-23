@@ -27,7 +27,7 @@ async def register(user_in: UserCreate):
     return APIResponse(
         success=True,
         message="User registered successfully",
-        data=UserProfileResponse.model_validate(user.model_dump(by_alias=True))
+        data=UserProfileResponse.model_validate(user.model_dump(by_alias=True, mode="json"))
     )
 
 @router.post("/login", response_model=TokenResponse)
@@ -43,16 +43,29 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         refresh_token=create_refresh_token(user.id)
     )
 
+from pydantic import BaseModel
+from jose import jwt, JWTError
+from backend.core.config import settings
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(current_user: UserProfile = Depends(get_current_user)):
-    return TokenResponse(
-        access_token=create_access_token(current_user.id),
-        refresh_token=create_refresh_token(current_user.id)
-    )
+async def refresh_token(body: RefreshRequest):
+    try:
+        payload = jwt.decode(body.refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise ValueError("Wrong token type")
+        user = await UserProfile.get(payload.get("sub"))
+        if not user or not user.is_active:
+            raise ValueError("Inactive account")
+    except (JWTError, ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
 
 @router.get("/me", response_model=APIResponse[UserProfileResponse])
 async def get_me(current_user: UserProfile = Depends(get_current_user)):
     return APIResponse(
         success=True,
-        data=UserProfileResponse.model_validate(current_user.model_dump(by_alias=True))
+        data=UserProfileResponse.model_validate(current_user.model_dump(by_alias=True, mode="json"))
     )

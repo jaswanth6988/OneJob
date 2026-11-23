@@ -18,9 +18,12 @@ export default function JobDetailPage() {
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
   const handleAIApply = async (mode: 'DRY_RUN' | 'LIVE' = 'DRY_RUN') => {
+    if (mode === 'LIVE' && !window.confirm('Submit a real application using your profile and resume? Review your details first.')) return;
     setApplying(true);
     setApplyMessage(null);
     try {
+      const preflight = await api.get<any>(`/applications/preflight/${job._id}`);
+      if (!preflight.data.ready) throw new Error(preflight.data.issues.join('. '));
       await api.applications.start(job._id, mode);
       setApplyMessage(`AI Auto-Application (${mode.replace('_', ' ')}) Started! Check Applications tab.`);
     } catch (e: any) {
@@ -34,7 +37,7 @@ export default function JobDetailPage() {
   useEffect(() => {
     const fetchJob = async () => {
       try {
-        const res = await api.get(`/jobs/${params.id}`);
+        const res = await api.get<any>(`/jobs/${params.id}`);
         setJob(res.data);
       } catch (e) {
         console.error(e);
@@ -69,7 +72,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto">
-      <button 
+      <button
         onClick={() => router.back()}
         className="flex items-center text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
       >
@@ -80,7 +83,7 @@ export default function JobDetailPage() {
       {/* Header Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-3xl rounded-full -mr-32 -mt-32 pointer-events-none"></div>
-        
+
         <div className="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div className="space-y-4">
             <div className="space-y-2">
@@ -137,9 +140,9 @@ export default function JobDetailPage() {
             >
               🚀 Live Auto-Submit Apply
             </button>
-            <a 
-              href={job.apply_url || job.url} 
-              target="_blank" 
+            <a
+              href={/^https?:\/\//i.test(job.apply_url || job.url || "") ? (job.apply_url || job.url) : undefined}
+              target="_blank"
               rel="noreferrer"
               className="flex items-center justify-center w-full px-4 py-2 rounded-lg bg-slate-900 text-slate-400 font-medium hover:text-slate-200 border border-slate-800 transition-colors text-xs mt-1"
             >
@@ -164,9 +167,10 @@ export default function JobDetailPage() {
         <div className="lg:col-span-2 space-y-8">
           <section className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8">
             <h2 className="text-xl font-semibold text-white mb-6">Job Description</h2>
-            <div 
+            <div
               className="prose prose-invert max-w-none text-slate-300 prose-a:text-blue-400 prose-headings:text-white"
-              dangerouslySetInnerHTML={{ __html: job.description.replace(/\n/g, '<br/>') }}
+              style={{ whiteSpace: "pre-wrap" }}
+              children={job.description.replace(/<[^>]*>/g, " ")}
             />
           </section>
         </div>
@@ -177,12 +181,12 @@ export default function JobDetailPage() {
             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
               <Sparkles className="w-24 h-24" />
             </div>
-            
+
             <h3 className="flex items-center text-lg font-semibold text-white mb-6">
               <Sparkles className="w-5 h-5 mr-2 text-blue-400" />
               AI Match Analysis
             </h3>
-            
+
             {job.score > 0 ? (
               <div className="space-y-6">
                 <div className="text-center pb-6 border-b border-slate-700">
@@ -237,7 +241,7 @@ export default function JobDetailPage() {
                   onClick={async () => {
                     setScoring(true);
                     try {
-                      const res = await api.post(`/jobs/${params.id}/score`, {});
+                      const res = await api.post<any>(`/jobs/${params.id}/score`, {});
                       setJob(res.data);
                     } catch(e) { console.error(e); }
                     finally { setScoring(false); }

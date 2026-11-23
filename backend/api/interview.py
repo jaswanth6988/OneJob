@@ -38,9 +38,11 @@ async def generate_interview_questions(
     resume = None
     if resume_id:
         resume = await Resume.get(resume_id)
+        if not resume or str(resume.user_id.ref.id if hasattr(resume.user_id, "ref") else resume.user_id.id) != str(current_user.id):
+            raise HTTPException(status_code=404, detail="Resume not found")
     if not resume:
         resume = await Resume.find(
-            Resume.user_id.id == current_user.id,
+            {"user_id": current_user.to_ref()},
             Resume.is_active == True
         ).sort([("created_at", -1)]).first_or_none()
 
@@ -68,9 +70,11 @@ async def evaluate_interview_answer(
     resume = None
     if request.resume_id:
         resume = await Resume.get(request.resume_id)
+        if not resume or str(resume.user_id.ref.id if hasattr(resume.user_id, "ref") else resume.user_id.id) != str(current_user.id):
+            raise HTTPException(status_code=404, detail="Resume not found")
     if not resume:
         resume = await Resume.find(
-            Resume.user_id.id == current_user.id,
+            {"user_id": current_user.to_ref()},
             Resume.is_active == True
         ).sort([("created_at", -1)]).first_or_none()
 

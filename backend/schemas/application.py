@@ -1,10 +1,10 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from datetime import datetime
 from pydantic import BaseModel, Field
 from backend.models.application import ApplicationStatus
 
 class ApplicationStartRequest(BaseModel):
-    mode: Optional[str] = "DRY_RUN"  # Options: DRY_RUN, LIVE
+    mode: Literal["DRY_RUN", "LIVE"] = "DRY_RUN"  # Options: DRY_RUN, LIVE
     resume_id: Optional[str] = None  # If omitted, picks best matching active resume
 
 class ApplicationResponse(BaseModel):
@@ -13,6 +13,8 @@ class ApplicationResponse(BaseModel):
     job_id: Optional[Any] = None
     resume_id: Optional[Any] = None
     
+    job_title: str = ""
+    company: str = ""
     status: ApplicationStatus
     mode: str
     apply_url: str

@@ -43,7 +43,7 @@ class JobManagerService:
                 job: JobPosting = connector.normalize_job(raw_job)
                 
                 # 2. Deduplicate
-                dup_key = self.generate_duplicate_key(job.company, job.title)
+                dup_key = f"{job.source_name}:{job.source_job_id}" if job.source_job_id else self.generate_duplicate_key(job.company, job.title) + ":" + (job.location or "")
                 job.duplicate_key = dup_key
                 
                 # Check if it exists in DB

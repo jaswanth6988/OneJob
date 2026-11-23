@@ -127,16 +127,7 @@ Evaluate this answer rigorously but fairly. Return a strict JSON object:
         ]
 
     def _fallback_evaluation(self, answer: str) -> Dict[str, Any]:
-        word_count = len(answer.split())
-        score = min(70, max(30, word_count * 2))
-        return {
-            "score": score,
-            "verdict": "Good" if score >= 60 else "Needs Improvement",
-            "strengths": ["You provided a response to the question."],
-            "improvements": ["Add specific examples using the STAR method (Situation, Task, Action, Result).", "Quantify your impact where possible."],
-            "missing_points": ["Specific measurable outcomes", "Concise structured format"],
-            "model_answer": "A strong answer would follow the STAR method: describe the Situation, your Task, the Actions you took, and the measurable Results achieved."
-        }
+        raise ValueError("AI provider unavailable or returned invalid output. No score was generated; please retry.")
 
 
 interview_coach = InterviewCoachService()

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright, Browser, Page, TimeoutError as PlaywrightTimeout
 
 from backend.core.config import settings
+from backend.automation.policy import profile_value, validate_apply_url
 from backend.models.application import JobApplication, ApplicationStatus
 from backend.models.job import JobPosting
 from backend.models.resume import Resume
@@ -70,6 +71,22 @@ class PlaywrightAutomationEngine:
                     viewport={"width": 1280, "height": 800},
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
                 )
+                async def guard(route):
+                    from urllib.parse import urlparse
+                    import socket, ipaddress
+                    try:
+                        url = route.request.url
+                        if url.startswith(("data:", "blob:")):
+                            return await route.continue_()
+                        validate_apply_url(url)
+                        host = urlparse(url).hostname
+                        addresses = await asyncio.get_running_loop().run_in_executor(None, socket.getaddrinfo, host, 443)
+                        if any(not ipaddress.ip_address(item[4][0]).is_global for item in addresses):
+                            return await route.abort()
+                        await route.continue_()
+                    except Exception:
+                        await route.abort()
+                await context.route("**/*", guard)
                 page = await context.new_page()
                 page.set_default_timeout(self.timeout_ms)
 
@@ -82,6 +99,8 @@ class PlaywrightAutomationEngine:
                 if init_shot:
                     screenshots.append(init_shot)
 
+                if await page.locator("input[type=password], iframe[src*=captcha], [class*=captcha]").count():
+                    raise ValueError("Login or CAPTCHA requires manual completion")
                 # 2. Extract and match common inputs
                 inputs = await page.query_selector_all("input:not([type='hidden']):not([type='submit']):not([type='button']), textarea, select")
                 logger.info(f"Found {len(inputs)} interactive form elements on page.")
@@ -117,21 +136,7 @@ class PlaywrightAutomationEngine:
                             continue
 
                         # Handle Standard Contact Information Fields
-                        filled_val = None
-                        if any(k in field_identifier for k in ["first name", "firstname", "fname"]):
-                            filled_val = getattr(user, "first_name", "Alex")
-                        elif any(k in field_identifier for k in ["last name", "lastname", "lname"]):
-                            filled_val = getattr(user, "last_name", "Developer")
-                        elif any(k in field_identifier for k in ["full name", "fullname", "name"]):
-                            filled_val = f"{getattr(user, 'first_name', 'Alex')} {getattr(user, 'last_name', 'Developer')}".strip()
-                        elif "email" in field_identifier:
-                            filled_val = getattr(user, "email", "applicant@example.com")
-                        elif any(k in field_identifier for k in ["phone", "tel", "mobile"]):
-                            filled_val = getattr(user, "phone", "+1 555 0199")
-                        elif any(k in field_identifier for k in ["linkedin", "linked in"]):
-                            filled_val = getattr(user, "linkedin_url", "https://linkedin.com/in/applicant-profile")
-                        elif any(k in field_identifier for k in ["github", "git", "portfolio", "website", "url"]):
-                            filled_val = getattr(user, "portfolio_url", "https://github.com/applicant")
+                        filled_val = profile_value(field_identifier, user)
 
                         if filled_val:
                             await elem.fill(str(filled_val))
@@ -149,6 +154,10 @@ class PlaywrightAutomationEngine:
                     except Exception as field_err:
                         logger.warning(f"Skipped filling element due to error: {field_err}")
 
+                if not submitted_fields:
+                    raise ValueError("No supported application fields were filled; open the application manually")
+                if await page.locator(":invalid").count():
+                    raise ValueError("Required form fields need manual review")
                 # 3. Take pre-submit verification screenshot
                 pre_submit_shot = await save_verification_screenshot(page, f"app_{application.id}_filled")
                 if pre_submit_shot:
@@ -157,7 +166,7 @@ class PlaywrightAutomationEngine:
                 # 4. Handle Submission Mode
                 if application.mode == "DRY_RUN":
                     logger.info("DRY_RUN Mode: Stopping right before final submit click.")
-                    application.status = ApplicationStatus.SUBMITTED
+                    application.status = ApplicationStatus.DRY_RUN_COMPLETE
                     submitted_fields["Execution_Notice"] = "Dry-Run verification successful. Form filled without final button press."
                 else:
                     logger.info("LIVE Mode: Attempting to locate and press Submit button...")
@@ -168,7 +177,11 @@ class PlaywrightAutomationEngine:
                         post_shot = await save_verification_screenshot(page, f"app_{application.id}_submitted")
                         if post_shot:
                             screenshots.append(post_shot)
-                        application.status = ApplicationStatus.SUBMITTED
+                        body_text = (await page.inner_text("body")).lower()
+                        confirmed = any(message in body_text for message in ["application has been submitted", "application received", "thank you for applying", "successfully submitted"])
+                        application.status = ApplicationStatus.SUBMITTED if confirmed else ApplicationStatus.REQUIRES_MANUAL_INTERVENTION
+                        if not confirmed:
+                            application.error_log = "Submit was clicked but confirmation was not observed. Review manually; do not retry blindly."
                     else:
                         logger.warning("Could not find unambiguous submit button. Requires manual verification.")
                         application.status = ApplicationStatus.REQUIRES_MANUAL_INTERVENTION

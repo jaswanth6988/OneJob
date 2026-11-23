@@ -11,6 +11,9 @@ router = APIRouter()
 
 
 class PreferencesUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
     preferred_roles: Optional[List[str]] = None
     preferred_locations: Optional[List[str]] = None
     expected_salary: Optional[str] = None

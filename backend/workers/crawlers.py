@@ -14,7 +14,7 @@ from backend.services.job_manager import job_manager
 logger = logging.getLogger(__name__)
 
 
-async def _async_crawl_all_sources(search_query: str = None):
+async def _async_crawl_all_sources(search_query: str = None, user_id: str = None, close_db_on_finish: bool = True):
     await init_db()
 
     total_new_jobs = 0
@@ -46,12 +46,13 @@ async def _async_crawl_all_sources(search_query: str = None):
 
     try:
         # Layer 1: Resume skills
-        active_resume = await Resume.find(Resume.is_active == True).sort([("created_at", -1)]).first_or_none()
+        user = await UserProfile.get(user_id) if user_id else None
+        active_resume = await Resume.find(Resume.is_active == True, {"user_id": user.to_ref()} if user else {"_id": None}).sort([("created_at", -1)]).first_or_none()
         if active_resume and active_resume.skills:
             default_keywords = list(dict.fromkeys(active_resume.skills[:10] + default_keywords))[:20]
 
         # Layer 2: User preferred roles (highest priority)
-        user = await UserProfile.find_one()
+        # Only use the requesting account for personalization.
         if user and user.preferred_roles:
             default_keywords = list(dict.fromkeys(user.preferred_roles + default_keywords))[:20]
 
@@ -80,17 +81,22 @@ async def _async_crawl_all_sources(search_query: str = None):
     results = await asyncio.gather(*[_crawl_single(c) for c in connectors])
     total_new_jobs = sum(results)
 
-    await close_db()
+    if close_db_on_finish:
+        await close_db()
     return total_new_jobs
 
 
 @celery_app.task(name="backend.workers.crawlers.crawl_all_sources")
-def crawl_all_sources(search_query: str = None):
+def crawl_all_sources(search_query: str = None, user_id: str = None):
     """Periodic task to crawl all configured job sources."""
     logger.info(f"Crawl All Sources task started with search={search_query}")
-    result = run_async(_async_crawl_all_sources(search_query))
+    result = run_async(_async_crawl_all_sources(search_query, user_id, close_db_on_finish=True))
 
     from backend.workers.scorer import score_new_jobs
-    score_new_jobs.delay()
+    if user_id:
+        try:
+            score_new_jobs.delay(user_id)
+        except Exception as e:
+            logger.warning(f"Could not enqueue scoring task: {e}")
 
     return f"Crawled {result} new jobs"

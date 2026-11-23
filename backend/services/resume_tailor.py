@@ -75,16 +75,7 @@ Return a strict JSON object with EXACTLY these fields:
             return self._fallback_response(resume, job)
 
     def _fallback_response(self, resume: Resume, job: JobPosting) -> Dict[str, Any]:
-        return {
-            "tailored_ats_score": 65,
-            "current_ats_score": 50,
-            "summary_rewrite": f"Results-driven professional with proven experience seeking the {job.title} role at {job.company}. Passionate about delivering high-impact solutions aligned with the team's mission.",
-            "skills_to_add": ["Communication", "Problem Solving", "Collaboration"],
-            "skills_to_highlight": resume.skills[:5],
-            "keyword_gaps": [],
-            "bullet_improvements": [],
-            "overall_advice": "Focus on quantifying your achievements and aligning your language with the job description's key phrases. Customize your summary for every application."
-        }
+        raise ValueError("AI provider unavailable or returned invalid output. No score was generated; please retry.")
 
 
 resume_tailor = ResumeTailorService()

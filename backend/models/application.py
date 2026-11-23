@@ -12,6 +12,7 @@ class ApplicationStatus(str, Enum):
     QUEUED = "QUEUED"
     APPLYING = "APPLYING"
     SUBMITTED = "SUBMITTED"
+    DRY_RUN_COMPLETE = "DRY_RUN_COMPLETE"
     REQUIRES_MANUAL_INTERVENTION = "REQUIRES_MANUAL_INTERVENTION"
     FAILED = "FAILED"
 
@@ -20,6 +21,8 @@ class JobApplication(Document):
     job_id: Link[JobPosting]
     resume_id: Optional[Link[Resume]] = None
     
+    job_title: str = ""
+    company: str = ""
     status: ApplicationStatus = ApplicationStatus.QUEUED
     mode: str = "DRY_RUN"  # Options: DRY_RUN, LIVE
     apply_url: str = ""

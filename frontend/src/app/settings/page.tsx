@@ -59,6 +59,7 @@ export default function SettingsPage() {
   const [prefs, setPrefs] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [crawling, setCrawling] = useState(false);
   const [crawlMsg, setCrawlMsg] = useState("");
@@ -73,12 +74,12 @@ export default function SettingsPage() {
   const set = (key: string, val: any) => setPrefs((p: any) => ({ ...p, [key]: val }));
 
   const save = async () => {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setError("");
     try {
       await api.put("/preferences", prefs);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) { console.error(e); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save changes"); }
     finally { setSaving(false); }
   };
 
@@ -87,7 +88,7 @@ export default function SettingsPage() {
     try {
       await save(); // Save prefs first so crawler picks them up
       await api.post("/jobs/crawl", {});
-      setCrawlMsg("Crawl started! New jobs will appear in ~30 seconds.");
+      setCrawlMsg("Discovery queued. Results depend on worker availability and source responses.");
     } catch (e) { setCrawlMsg("Failed to start crawl. Is Celery worker running?"); }
     finally { setCrawling(false); }
   };
@@ -126,6 +127,7 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      {error && <div className="notice error" role="alert">{error}</div>}
       {/* Tab Selector */}
       <div className="flex gap-2 border-b border-slate-800 pb-0">
         {tabs.map(t => {

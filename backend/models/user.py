@@ -23,6 +23,7 @@ class UserProfile(Document):
     priority_companies: List[str] = Field(default_factory=list)
     priority_roles: List[str] = Field(default_factory=list)
     
+    saved_jobs: List[str] = Field(default_factory=list)
     is_active: bool = True
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

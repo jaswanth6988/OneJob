@@ -7,18 +7,23 @@ from backend.services.ai_matcher import ai_matcher
 
 logger = logging.getLogger(__name__)
 
-async def _async_score_new_jobs():
+async def _async_score_new_jobs(user_id: str = None):
     await init_db()
     
-    # 1. Get all active resumes
-    active_resumes = await Resume.find(Resume.is_active == True).to_list()
+    from backend.models.user import UserProfile
+    user = await UserProfile.get(user_id) if user_id else None
+    if not user:
+        await close_db()
+        return 0
+    # 1. Get the requesting account's active resumes
+    active_resumes = await Resume.find(Resume.is_active == True, {"user_id": user.to_ref()}).to_list()
     if not active_resumes:
         logger.warning("No active resumes found. Skipping scoring.")
         await close_db()
         return 0
 
     # 2. Get all NEW jobs (limit to 50 at a time to prevent timeout)
-    new_jobs = await JobPosting.find(JobPosting.status == JobStatus.NEW).limit(50).to_list()
+    new_jobs = await JobPosting.find({f"user_matches.{user_id}": {"$exists": False}}).limit(50).to_list()
     
     if not new_jobs:
         logger.info("No NEW jobs to score.")
@@ -32,7 +37,7 @@ async def _async_score_new_jobs():
             # Score it
             updated_job = await ai_matcher.score_job(job, active_resumes)
             # Save it back
-            await updated_job.save()
+            await JobPosting.find_one(JobPosting.id == job.id).update({"$set": {f"user_matches.{user_id}": {"score": updated_job.score, "match_result": updated_job.match_result, "status": updated_job.status}}})
             scored_count += 1
             
             # Be polite to the API, but rely on backend.core.llm's exponential backoff for actual rate limits
@@ -46,10 +51,10 @@ async def _async_score_new_jobs():
     return scored_count
 
 @celery_app.task(name="backend.workers.scorer.score_new_jobs")
-def score_new_jobs():
+def score_new_jobs(user_id: str = None):
     """
     Task to score any newly discovered jobs against the user's active resumes.
     """
     logger.info("Scorer task started")
-    result = run_async(_async_score_new_jobs())
+    result = run_async(_async_score_new_jobs(user_id))
     return f"Scored {result} jobs"

@@ -22,13 +22,18 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Build
+# Build & Cache
 .next/
 out/
 dist/
 build/
+.pytest_cache/
 
-# Storage (keep structure, ignore files)
+# Storage (keep structure, ignore all files)
+storage/*
+!storage/resumes/
+!storage/screenshots/
+!storage/logs/
 storage/resumes/*
 storage/screenshots/*
 storage/logs/*

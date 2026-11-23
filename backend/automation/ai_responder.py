@@ -15,10 +15,8 @@ class AIScreeningResponder:
         Using direct HTTP REST prevents C++ gRPC/cygrpc DLL locking issues on Windows environments while keeping execution 100% async.
         """
         if not settings.GEMINI_API_KEY:
-            logger.warning("GEMINI_API_KEY missing. Returning default candidate response.")
-            return "I am excited about this opportunity and confident my skills align well with the team's needs. Please refer to my attached resume for comprehensive details."
-
-        resume_info = "Candidate is an experienced software engineer and full stack developer."
+            raise ValueError("AI provider unavailable; screening answers require manual review")
+        resume_info = "No candidate evidence available. Do not invent facts."
         if resume:
             resume_info = f"Title: {resume.title}\nSkills: {', '.join(resume.skills)}\nText Summary: {resume.parsed_text[:1500]}"
 
@@ -39,18 +37,18 @@ class AIScreeningResponder:
 
         RULES:
         1. Answer directly and concisely as the candidate (in first person 'I').
-        2. If asked for years of experience or numbers, estimate reasonably based on skills or state a reasonable figure (e.g. "3+ years").
-        3. If asked for salary expectations, respond politely like "Negotiable based on total compensation package and market standards."
+        2. Never invent years, qualifications, authorization, achievements, or other facts. Return NEEDS_REVIEW when evidence is missing.
+        3. Return NEEDS_REVIEW for salary, legal declarations, consent, work authorization, or sensitive information not explicitly provided.
         4. Keep conversational answers under 3 sentences unless requested otherwise.
         5. Return ONLY the final plaintext response string to be entered directly into the form input box, without introductory filler or markdown formatting.
         """
 
         answer = await generate_content(prompt, max_retries=2, timeout=15.0)
         
-        if answer:
-            logger.info(f"Generated AI response for question '{question_text}': {answer}")
+        if answer and "NEEDS_REVIEW" not in answer:
+            logger.info("Generated evidence-based screening draft")
             return answer
 
-        return "I have a strong technical background and immense enthusiasm for this domain, and look forward to discussing how my experience can contribute to your goals."
+        raise ValueError("Screening answer needs review; insufficient evidence or provider failure")
 
 ai_responder = AIScreeningResponder()

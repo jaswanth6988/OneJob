@@ -19,7 +19,7 @@ export default function ResumesPage() {
     try {
       const res = await api.resumes.getResumes();
       if (res.success) {
-        setResumes(res.data);
+        setResumes(res.data || []);
       }
     } catch (e) {
       console.error('Failed to fetch resumes:', e);
@@ -135,7 +135,7 @@ export default function ResumesPage() {
               </div>
               
               <div className="border-t border-slate-800 p-3 bg-slate-900/80 flex justify-between items-center">
-                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-300 hover:text-white" onClick={() => alert("Resume Viewer coming soon!")}>
+                <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-slate-300 hover:text-white" onClick={() => { window.location.href = `/resumes/${(resume as any)._id || resume.id}`; }}>
                   <Eye className="h-3.5 w-3.5" />
                   View
                 </Button>

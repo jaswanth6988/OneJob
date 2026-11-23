@@ -77,7 +77,7 @@ app.include_router(preferences_router, prefix="/api/preferences", tags=["Prefere
 
 # Mount static storage for screenshots & resumes
 os.makedirs("storage", exist_ok=True)
-app.mount("/storage", StaticFiles(directory="storage"), name="storage")
+
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():

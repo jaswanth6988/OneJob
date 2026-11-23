@@ -18,20 +18,23 @@ import {
   X,
   Sparkles
 } from "lucide-react";
+import PrivateImage from "@/components/PrivateImage";
 import { api } from "@/lib/api";
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState<any | null>(null);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<string>("ALL");
 
   const fetchApplications = async () => {
+    setError("");
     try {
       const res = await api.applications.list(filter !== "ALL" ? filter : undefined);
       setApplications(res.data || []);
     } catch (e) {
-      console.error("Failed to fetch application records:", e);
+      setError(e instanceof Error ? e.message : "Unable to load applications");
     } finally {
       setLoading(false);
     }
@@ -52,10 +55,11 @@ export default function ApplicationsPage() {
       });
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [filter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "DRY_RUN_COMPLETE": return <Badge variant="info">Dry run complete · not submitted</Badge>;
       case "SUBMITTED":
         return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Verified / Submitted</Badge>;
       case "APPLYING":
@@ -78,15 +82,9 @@ export default function ApplicationsPage() {
     manual: applications.filter(a => a.status === "REQUIRES_MANUAL_INTERVENTION" || a.status === "FAILED").length,
   };
 
-  const formatImageUrl = (path: string) => {
-    if (!path) return "";
-    // Ensure backslashes are converted to URL forward slashes
-    const cleanPath = path.replace(/\\/g, "/");
-    return `http://localhost:8000/${cleanPath.startsWith("storage/") ? cleanPath : `storage/${cleanPath}`}`;
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {error && <div className="notice error" role="alert">{error}<button onClick={fetchApplications}>Retry</button></div>}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">AI Applications Tracker</h1>
@@ -294,19 +292,11 @@ export default function ApplicationsPage() {
               {selectedApp.screenshots && selectedApp.screenshots.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {selectedApp.screenshots.map((path: string, idx: number) => {
-                    const imgUrl = formatImageUrl(path);
+
                     return (
                       <div key={idx} className="space-y-1 group relative">
                         <div className="border border-slate-700 rounded-lg overflow-hidden bg-black/60 aspect-video relative flex items-center justify-center">
-                          <img src={imgUrl} alt={`Verification step ${idx+1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
-                          <a 
-                            href={imgUrl} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1 transition-opacity"
-                          >
-                            <Eye className="w-4 h-4" /> Open High-Res Full Screenshot
-                          </a>
+                          <PrivateImage applicationId={selectedApp._id || selectedApp.id} index={idx}/>
                         </div>
                         <p className="text-xs text-slate-400 font-mono flex items-center justify-between px-1">
                           <span>Step {idx + 1}: {path.split(/[\/\\]/).pop()?.split('_')[2] || 'Capture'}</span>

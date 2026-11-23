@@ -64,7 +64,7 @@ Return ONLY a strict JSON object:
                 logger.warning(f"Failed to score job {job.id} (likely rate limited). Will retry next cycle.")
                 return job # Stays NEW
 
-            score = float(result_data.get("score", 0))
+            score = max(0, min(100, float(result_data.get("score", 0))))
             matched = result_data.get("matched_skills", [])
             missing = result_data.get("missing_skills", [])
             reason = result_data.get("confidence_reasoning", "")
@@ -74,7 +74,7 @@ Return ONLY a strict JSON object:
                 "matched_skills": matched,
                 "missing_skills": missing,
                 "reason": reason,
-                "confidence": 0.95,
+                "confidence": 0.0,
             }
 
             # Update status based on score thresholds

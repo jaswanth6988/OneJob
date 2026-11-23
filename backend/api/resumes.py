@@ -25,7 +25,7 @@ async def upload_resume(
     current_user: UserProfile = Depends(get_current_user)
 ):
     # Validate file type
-    filename = file.filename
+    filename = os.path.basename((file.filename or "").replace("\\", "/"))
     ext = filename.split(".")[-1].lower() if filename else ""
     if ext not in ["pdf", "docx"]:
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed")
@@ -39,7 +39,9 @@ async def upload_resume(
     
     try:
         async with aiofiles.open(file_path, "wb") as f:
-            content = await file.read()
+            content = await file.read(10 * 1024 * 1024 + 1)
+            if len(content) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="Resume must be smaller than 10 MB")
             await f.write(content)
             
         # Parse resume (uses AI for extraction and runs PDF parsing in executor internally)
@@ -60,6 +62,8 @@ async def upload_resume(
             education=parsed_data.education,
             certifications=parsed_data.certifications
         )
+        from backend.services.resume_rating import rate_resume
+        resume.ats_score = rate_resume(resume.parsed_text, resume.skills)["score"]
         await resume.insert()
         
         return APIResponse(
@@ -72,11 +76,13 @@ async def upload_resume(
         # Cleanup file if it was created
         if os.path.exists(file_path):
             os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"Failed to process resume: {str(e)}")
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail="Could not parse this resume. Check the file and AI configuration.")
 
 @router.get("", response_model=APIResponse[List[ResumeListResponse]])
 async def list_resumes(current_user: UserProfile = Depends(get_current_user)):
-    resumes = await Resume.find(Resume.user_id.id == current_user.id, Resume.is_active == True).to_list()
+    resumes = await Resume.find({"user_id": current_user.to_ref()}, Resume.is_active == True).to_list()
     return APIResponse(
         success=True,
         data=[ResumeListResponse.model_validate(r.model_dump(by_alias=True, mode="json")) for r in resumes]
@@ -92,7 +98,7 @@ async def get_resume(id: str, current_user: UserProfile = Depends(get_current_us
 
     resume = await Resume.find_one(
         Resume.id == obj_id,
-        Resume.user_id.id == current_user.id,
+        {"user_id": current_user.to_ref()},
         Resume.is_active == True
     )
     if not resume:
@@ -117,7 +123,7 @@ async def update_resume(
 
     resume = await Resume.find_one(
         Resume.id == obj_id,
-        Resume.user_id.id == current_user.id,
+        {"user_id": current_user.to_ref()},
         Resume.is_active == True
     )
     if not resume:
@@ -146,7 +152,7 @@ async def delete_resume(id: str, current_user: UserProfile = Depends(get_current
     # Use find_one with combined filter — avoids broken Link attribute comparison
     resume = await Resume.find_one(
         Resume.id == obj_id,
-        Resume.user_id.id == current_user.id,
+        {"user_id": current_user.to_ref()},
         Resume.is_active == True
     )
     if not resume:
@@ -156,3 +162,20 @@ async def delete_resume(id: str, current_user: UserProfile = Depends(get_current
     await resume.set({"is_active": False, "updated_at": datetime.now(timezone.utc)})
 
     return APIResponse(success=True, message="Resume deleted successfully")
+
+@router.get("/{id}/download")
+async def download_resume(id: str, current_user: UserProfile = Depends(get_current_user)):
+    from beanie import PydanticObjectId
+    from fastapi.responses import FileResponse
+    if not PydanticObjectId.is_valid(id):
+        raise HTTPException(status_code=404, detail="Resume not found")
+    resume = await Resume.find_one(Resume.id == PydanticObjectId(id), {"user_id": current_user.to_ref()}, Resume.is_active == True)
+    if not resume or not os.path.isfile(resume.file_path):
+        raise HTTPException(status_code=404, detail="Resume file not found")
+    return FileResponse(resume.file_path, filename=resume.original_filename)
+
+@router.get("/{id}/rating")
+async def resume_rating(id: str, current_user: UserProfile = Depends(get_current_user)):
+    from backend.services.resume_rating import rate_resume
+    result = await get_resume(id, current_user)
+    return APIResponse(success=True, data=rate_resume(result.data.parsed_text, result.data.skills))

@@ -39,6 +39,7 @@ class JobPosting(Document):
     
     normalized_fields: Dict[str, Any] = Field(default_factory=dict)
     
+    user_matches: Dict[str, Any] = Field(default_factory=dict)
     score: float = 0.0
     status: JobStatus = JobStatus.NEW
     match_result: Dict[str, Any] = Field(default_factory=dict)

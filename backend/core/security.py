@@ -52,19 +52,17 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: Optional[timed
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(OAuth2PasswordBearer(tokenUrl=f"/api/auth/login", auto_error=False))) -> UserProfile:
-    # ---------------------------------------------------------
-    # DEV BYPASS: Return a dummy user since frontend login isn't built yet
-    # ---------------------------------------------------------
-    dummy_email = "dev@example.com"
-    user = await UserProfile.find_one(UserProfile.email == dummy_email)
-    if not user:
-        user = UserProfile(
-            email=dummy_email,
-            name="John Smith",
-            hashed_password="dummy",
-            is_active=True
-        )
-        await user.insert()
+async def get_current_user(token: str = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False))) -> UserProfile:
+    unauthorized = HTTPException(status_code=401, detail="Please sign in to continue", headers={"WWW-Authenticate": "Bearer"})
+    if not token:
+        raise unauthorized
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "access" or not payload.get("sub"):
+            raise unauthorized
+        user = await UserProfile.get(payload["sub"])
+    except (JWTError, ValueError, ValidationError):
+        raise unauthorized
+    if not user or not user.is_active:
+        raise unauthorized
     return user
-    # ---------------------------------------------------------
